@@ -101,6 +101,20 @@ print(result.compliance_score)  # 0.98
 print(result.phi_detected_count)  # 15
 ```
 
+### Processing Documents by Type
+```python
+from hipaa_compliance_summarizer import (
+    HIPAAProcessor,
+    Document,
+    DocumentType,
+)
+
+processor = HIPAAProcessor()
+doc = Document("note.txt", DocumentType.CLINICAL_NOTE)
+result = processor.process_document(doc)
+print(result.summary)
+```
+
 ### Compliance Reporting
 ```python
 from hipaa_summarizer import ComplianceReporter
