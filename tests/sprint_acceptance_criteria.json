@@ -1,10 +1,33 @@
 {
-  "establish-a-testing-framework-(`pytest`,-etc.)-with-initial-tests.": {
-    "test_file": "tests/test_foundational.py",
-    "description": "Verifies that Establish a testing framework (`pytest`, etc.) with initial tests.",
+  "doc-models-detection": {
+    "test_file": "tests/test_document_models.py",
+    "description": "Document models and detection correctly identify document types.",
     "cases": {
-      "success": "Asserts the primary success case.",
-      "edge_case_null_input": "Asserts that providing null input is handled gracefully."
+      "detect_clinical_note": "detect_document_type(\"clinical_note.txt\") returns DocumentType.CLINICAL_NOTE",
+      "unknown_type": "detect_document_type(\"misc.pdf\") returns DocumentType.UNKNOWN"
+    }
+  },
+  "parsers-implementation": {
+    "test_file": "tests/test_parsers.py",
+    "description": "Parsers correctly extract text for each healthcare document type.",
+    "cases": {
+      "parse_medical_record": "parse_medical_record(sample_record) returns text string",
+      "empty_input": "parse_medical_record(\"\") handles empty string gracefully"
+    }
+  },
+  "processor-integration": {
+    "test_file": "tests/test_processor_integration.py",
+    "description": "HIPAAProcessor routes documents by type and produces summaries.",
+    "cases": {
+      "process_clinical_note": "process_document(Document(path=\"note.txt\", type=DocumentType.CLINICAL_NOTE)) returns ProcessingResult",
+      "unknown_type_fallback": "process_document(Document(path=\"misc.txt\", type=DocumentType.UNKNOWN)) uses generic processing"
+    }
+  },
+  "docs-update": {
+    "test_file": "tests/test_docs_updated.py",
+    "description": "README includes instructions for processing healthcare document types.",
+    "cases": {
+      "usage_example_present": "README contains example code snippet for HIPAAProcessor with document types"
     }
   }
 }
