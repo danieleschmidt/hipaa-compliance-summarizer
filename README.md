@@ -9,7 +9,7 @@ Healthcare-focused LLM agent that automatically redacts PHI (Protected Health In
 - **Compliance Reporting**: Generates detailed compliance summaries and audit trails
 - **Healthcare Document Types**: Specialized handling for medical records, clinical notes, insurance forms
 - **Risk Assessment**: Identifies potential HIPAA violations and compliance gaps
-- **Batch Processing**: Handle large volumes of healthcare documents securely
+- **Batch Processing**: Handle large volumes of healthcare documents securely using `BatchProcessor`
 
 ## Quick Start
 
@@ -18,14 +18,26 @@ Healthcare-focused LLM agent that automatically redacts PHI (Protected Health In
 pip install -r requirements.txt
 pip install hipaa-ml-toolkit
 
+
 # Process a single medical document
-python summarize.py --file patient_record.pdf --redact-phi
+hipaa-summarize --file patient_record.pdf --compliance-level strict
 
 # Batch process medical records
-python batch_process.py --input-dir ./medical_records --compliance-check
+hipaa-batch-process \
+  --input-dir ./medical_records \
+  --output-dir ./redacted_records \
+  --compliance-level standard \
+  --generate-summaries \
+  --show-dashboard \
+  --dashboard-json dashboard.json
+
+# Example dashboard output
+Documents processed: 20
+Average compliance score: 0.98
+Total PHI detected: 75
 
 # Generate compliance report
-python compliance_report.py --audit-period "2024-Q1"
+hipaa-compliance-report --audit-period "2024-Q1"
 ```
 
 ## HIPAA Compliance Features
@@ -88,7 +100,7 @@ output:
 
 ### Basic PHI Redaction
 ```python
-from hipaa_summarizer import HIPAAProcessor
+from hipaa_compliance_summarizer import HIPAAProcessor
 
 processor = HIPAAProcessor(compliance_level="strict")
 result = processor.process_document("patient_chart.pdf")
@@ -117,7 +129,7 @@ print(result.summary)
 
 ### Compliance Reporting
 ```python
-from hipaa_summarizer import ComplianceReporter
+from hipaa_compliance_summarizer import ComplianceReporter
 
 reporter = ComplianceReporter()
 report = reporter.generate_report(
@@ -135,18 +147,19 @@ print(report.recommendations)
 
 ### Batch Processing
 ```python
-from hipaa_summarizer import BatchProcessor
+from hipaa_compliance_summarizer import BatchProcessor
 
 processor = BatchProcessor()
 results = processor.process_directory(
     "./medical_records",
     output_dir="./processed_records",
-    redaction_level="high",
+    compliance_level="strict",
     generate_summaries=True
 )
 
 # Generate compliance dashboard
 dashboard = processor.generate_dashboard(results)
+processor.save_dashboard(results, "dashboard.json")
 ```
 
 ## Document Types Supported
@@ -277,7 +290,7 @@ processor.add_clinical_rule(
 ### Integration with EHR Systems
 ```python
 # Epic EHR integration
-from hipaa_summarizer.integrations import EpicConnector
+from hipaa_compliance_summarizer.integrations import EpicConnector
 
 epic = EpicConnector(api_key="your_epic_key")
 records = epic.fetch_patient_records(patient_id="12345")
@@ -287,7 +300,7 @@ processed = processor.process_ehr_batch(records)
 ### Audit and Monitoring
 ```python
 # Real-time compliance monitoring
-from hipaa_summarizer import ComplianceMonitor
+from hipaa_compliance_summarizer import ComplianceMonitor
 
 monitor = ComplianceMonitor()
 monitor.start_real_time_monitoring(

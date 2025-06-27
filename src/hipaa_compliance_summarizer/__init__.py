@@ -1,6 +1,7 @@
 from .phi import PHIRedactor, RedactionResult, Entity
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
 from .reporting import ComplianceReporter, ComplianceReport
+from .batch import BatchProcessor, BatchDashboard
 from .documents import DocumentType, Document, detect_document_type
 from .parsers import (
     parse_medical_record,
@@ -23,4 +24,6 @@ __all__ = [
     "parse_medical_record",
     "parse_clinical_note",
     "parse_insurance_form",
+    "BatchProcessor",
+    "BatchDashboard",
 ]
