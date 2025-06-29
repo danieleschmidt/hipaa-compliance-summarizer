@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence, Optional
+import logging
 
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
@@ -38,6 +39,9 @@ class BatchDashboard:
         return json.dumps(self.to_dict(), indent=2)
 
 
+logger = logging.getLogger(__name__)
+
+
 class BatchProcessor:
     """Process directories of healthcare documents."""
 
@@ -51,6 +55,7 @@ class BatchProcessor:
         output_dir: Optional[str] = None,
         compliance_level: Optional[str] = None,
         generate_summaries: bool = False,
+        show_progress: bool = False,
     ) -> List[ProcessingResult]:
         """Process all files in ``input_dir`` and optionally write outputs."""
         if compliance_level is not None:
@@ -63,13 +68,18 @@ class BatchProcessor:
         if out_path:
             out_path.mkdir(parents=True, exist_ok=True)
 
-        for file in in_path.iterdir():
+        files = [f for f in in_path.iterdir() if f.is_file()]
+        total = len(files)
+        for i, file in enumerate(files, start=1):
             if not file.is_file():
                 continue
+            logger.info("Processing file %s", file)
             doc_type = detect_document_type(file.name)
             doc = Document(str(file), doc_type)
             result = self.processor.process_document(doc)
             results.append(result)
+            if show_progress:
+                print(f"[{i}/{total}] {file.name}")
 
             if out_path:
                 out_file = out_path / file.name
@@ -98,3 +108,4 @@ class BatchProcessor:
         """Write a dashboard summary for ``results`` to ``path`` as JSON."""
         dash = self.generate_dashboard(results)
         Path(path).write_text(dash.to_json())
+        logger.info("Dashboard saved to %s", path)

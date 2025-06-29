@@ -1,0 +1,9 @@
+patterns:
+  ssn: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+  phone: "\\b\\d{3}[.-]\\d{3}[.-]\\d{4}\\b"
+  email: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b"
+  date: "\\b\\d{2}/\\d{2}/\\d{4}\\b"
+scoring:
+  penalty_per_entity: 0.01
+  penalty_cap: 0.2
+  strict_multiplier: 1.5
