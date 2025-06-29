@@ -99,7 +99,8 @@ output:
 
 Scoring penalties and PHI detection patterns can be adjusted in this file.
 Set the ``HIPAA_CONFIG_PATH`` environment variable to load a custom
-configuration file.
+configuration file or ``HIPAA_CONFIG_YAML`` to provide the YAML directly
+via environment variable.
 
 ## Usage Examples
 

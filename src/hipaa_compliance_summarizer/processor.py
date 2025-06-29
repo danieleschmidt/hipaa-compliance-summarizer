@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import logging
+import time
 from pathlib import Path
 from typing import Optional, Union
 
@@ -76,6 +77,7 @@ class HIPAAProcessor:
     def process_document(self, document: Union[str, Document]) -> ProcessingResult:
         """Process a document path, raw text, or :class:`Document` instance."""
         logger.info("Processing document %s", getattr(document, 'path', document))
+        start = time.perf_counter()
         if isinstance(document, Document):
             if document.type == DocumentType.MEDICAL_RECORD:
                 text = parse_medical_record(document.path)
@@ -90,7 +92,13 @@ class HIPAAProcessor:
         redacted = self.redactor.redact(text)
         summary = self._summarize(redacted.text)
         score = self._score(redacted)
-        logger.debug("Compliance score %.2f with %d entities", score, len(redacted.entities))
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "Processed document in %.2f ms with score %.2f and %d entities",
+            elapsed_ms,
+            score,
+            len(redacted.entities),
+        )
         return ProcessingResult(
             summary=summary,
             compliance_score=score,

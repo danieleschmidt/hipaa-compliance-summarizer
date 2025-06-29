@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import re
 from typing import Dict, List
 
@@ -25,6 +26,12 @@ class RedactionResult:
     entities: List[Entity]
 
 
+@lru_cache(maxsize=None)
+def _compile_pattern(expr: str) -> re.Pattern:
+    """Compile regex expressions once and cache them."""
+    return re.compile(expr)
+
+
 class PHIRedactor:
     """Simple PHI detection and redaction utility."""
 
@@ -38,7 +45,7 @@ class PHIRedactor:
                 "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
                 "date": r"\b\d{2}/\d{2}/\d{4}\b",
             }
-        self.patterns = {name: re.compile(expr) for name, expr in raw_patterns.items()}
+        self.patterns = {name: _compile_pattern(expr) for name, expr in raw_patterns.items()}
 
     def detect(self, text: str) -> List[Entity]:
         """Detect PHI entities in ``text``."""

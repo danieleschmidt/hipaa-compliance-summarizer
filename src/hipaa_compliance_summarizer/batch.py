@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence, Optional
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 from .documents import Document, detect_document_type
@@ -56,6 +57,7 @@ class BatchProcessor:
         compliance_level: Optional[str] = None,
         generate_summaries: bool = False,
         show_progress: bool = False,
+        max_workers: int = 1,
     ) -> List[ProcessingResult]:
         """Process all files in ``input_dir`` and optionally write outputs."""
         if compliance_level is not None:
@@ -70,23 +72,27 @@ class BatchProcessor:
 
         files = [f for f in in_path.iterdir() if f.is_file()]
         total = len(files)
-        for i, file in enumerate(files, start=1):
-            if not file.is_file():
-                continue
+
+        def handle(file: Path) -> ProcessingResult:
             logger.info("Processing file %s", file)
             doc_type = detect_document_type(file.name)
             doc = Document(str(file), doc_type)
             result = self.processor.process_document(doc)
-            results.append(result)
-            if show_progress:
-                print(f"[{i}/{total}] {file.name}")
-
             if out_path:
                 out_file = out_path / file.name
                 out_file.write_text(result.redacted.text)
                 if generate_summaries:
                     summary_file = out_file.with_suffix(out_file.suffix + ".summary.txt")
                     summary_file.write_text(result.summary)
+            return result
+
+        processed = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for result in executor.map(handle, files):
+                processed += 1
+                results.append(result)
+                if show_progress:
+                    print(f"[{processed}/{total}] {files[processed-1].name}")
 
         return results
 

@@ -1,0 +1,4 @@
+[run]
+parallel = True
+omit =
+    src/hipaa_compliance_summarizer/cli/*
