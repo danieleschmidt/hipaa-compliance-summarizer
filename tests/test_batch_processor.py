@@ -36,3 +36,11 @@ def test_process_directory_progress(tmp_path, capsys):
     proc.process_directory(str(tmp_path), show_progress=True)
     captured = capsys.readouterr()
     assert "[1/1]" in captured.out
+
+
+def test_parallel_processing(tmp_path):
+    for i in range(4):
+        (tmp_path / f"f{i}.txt").write_text("SSN: 000-00-0000")
+    proc = BatchProcessor()
+    results = proc.process_directory(str(tmp_path), max_workers=2)
+    assert len(results) == 4

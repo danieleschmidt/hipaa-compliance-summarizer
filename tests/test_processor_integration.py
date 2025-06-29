@@ -1,24 +1,27 @@
-from hipaa_compliance_summarizer import (
-    HIPAAProcessor,
-    ProcessingResult,
-    Document,
-    DocumentType,
-)
+from hipaa_compliance_summarizer import HIPAAProcessor, Document, DocumentType
+import logging
 
 
-def test_process_clinical_note(tmp_path):
-    f = tmp_path / "note.txt"
-    f.write_text("Patient is stable")
-    doc = Document(str(f), DocumentType.CLINICAL_NOTE)
+def test_processor_redacts_and_scores(tmp_path):
+    """Ensure end-to-end processing yields deterministic results."""
+
+    path = tmp_path / "phi.txt"
+    path.write_text("Patient SSN 123-45-6789 is stable.")
+
+    doc = Document(str(path), DocumentType.CLINICAL_NOTE)
     proc = HIPAAProcessor()
     result = proc.process_document(doc)
-    assert isinstance(result, ProcessingResult)
+
+    assert result.phi_detected_count == 1
+    assert "[REDACTED]" in result.redacted.text
+    assert 0.0 <= result.compliance_score <= 1.0
 
 
-def test_unknown_type_fallback(tmp_path):
-    f = tmp_path / "misc.txt"
-    f.write_text("Some text content")
-    doc = Document(str(f), DocumentType.UNKNOWN)
+def test_processor_logs_metrics(tmp_path, caplog):
+    path = tmp_path / "phi.txt"
+    path.write_text("Patient SSN 123-45-6789 is stable.")
+    doc = Document(str(path), DocumentType.CLINICAL_NOTE)
     proc = HIPAAProcessor()
-    result = proc.process_document(doc)
-    assert isinstance(result, ProcessingResult)
+    with caplog.at_level(logging.INFO):
+        proc.process_document(doc)
+    assert any("score" in rec.message for rec in caplog.records)
