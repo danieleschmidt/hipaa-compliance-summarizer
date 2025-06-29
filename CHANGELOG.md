@@ -20,3 +20,11 @@
 - Rename batch process flag to `--compliance-level` for consistency
 - Add `--dashboard-json` option to save dashboard metrics as JSON
 - Provide `BatchProcessor.save_dashboard` helper for exporting metrics
+- Introduce GitHub Actions CI with lint, security scan and tests
+- Add CONTRIBUTING guide and initial compliance docs
+- Fix truncated `.gitignore`
+- Load scoring and PHI patterns from configurable `config/hipaa_config.yml`
+- Add logging to processor and batch modules
+- Install `pip-audit` in CI for vulnerability scanning
+- Stream large files with `PHIRedactor.redact_file`
+- Show progress in `BatchProcessor.process_directory`

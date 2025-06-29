@@ -29,3 +29,10 @@ def test_save_dashboard(tmp_path):
     assert out_file.exists()
     content = out_file.read_text()
     assert "documents_processed" in content
+
+def test_process_directory_progress(tmp_path, capsys):
+    (tmp_path / "a.txt").write_text("A")
+    proc = BatchProcessor()
+    proc.process_directory(str(tmp_path), show_progress=True)
+    captured = capsys.readouterr()
+    assert "[1/1]" in captured.out

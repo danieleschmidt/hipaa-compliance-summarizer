@@ -17,6 +17,7 @@ Healthcare-focused LLM agent that automatically redacts PHI (Protected Health In
 # Install with healthcare extensions
 pip install -r requirements.txt
 pip install hipaa-ml-toolkit
+pip install -e .  # install package locally for CLI
 
 
 # Process a single medical document
@@ -96,6 +97,10 @@ output:
   redaction_summary: true
 ```
 
+Scoring penalties and PHI detection patterns can be adjusted in this file.
+Set the ``HIPAA_CONFIG_PATH`` environment variable to load a custom
+configuration file.
+
 ## Usage Examples
 
 ### Basic PHI Redaction
@@ -154,12 +159,22 @@ results = processor.process_directory(
     "./medical_records",
     output_dir="./processed_records",
     compliance_level="strict",
-    generate_summaries=True
+    generate_summaries=True,
+    show_progress=True
 )
 
 # Generate compliance dashboard
 dashboard = processor.generate_dashboard(results)
 processor.save_dashboard(results, "dashboard.json")
+```
+
+### Streaming Redaction
+```python
+from hipaa_compliance_summarizer import PHIRedactor
+
+redactor = PHIRedactor()
+result = redactor.redact_file("large_record.txt")
+print(result.text)
 ```
 
 ## Document Types Supported
@@ -392,6 +407,13 @@ Priority areas for contribution:
 - Security enhancements
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and security requirements.
+
+## Continuous Integration
+
+All pull requests run through GitHub Actions. The workflow installs
+dependencies, runs `ruff` and `bandit`, and executes the test suite with
+coverage reporting. Coverage results are uploaded as build artifacts.
+Dependencies are also scanned with `pip-audit` for known vulnerabilities.
 
 ## Legal & Compliance
 
