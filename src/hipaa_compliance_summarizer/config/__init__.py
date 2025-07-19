@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / 'config' / 'hipaa_config.yml'
+DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent.parent / 'config' / 'hipaa_config.yml'
 
 # Define sensitive environment variables that should be loaded securely
 SENSITIVE_ENV_VARS = {

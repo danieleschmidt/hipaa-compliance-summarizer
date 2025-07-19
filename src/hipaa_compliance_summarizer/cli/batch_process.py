@@ -47,6 +47,11 @@ def main() -> None:
         "--dashboard-json",
         help="Write dashboard summary to a JSON file",
     )
+    parser.add_argument(
+        "--show-cache-performance",
+        action="store_true",
+        help="Display cache performance metrics after processing",
+    )
     args = parser.parse_args()
 
     processor = BatchProcessor()
@@ -66,6 +71,18 @@ def main() -> None:
         if dash is None:
             dash = processor.generate_dashboard(results)
         processor.save_dashboard(results, args.dashboard_json)
+
+    if args.show_cache_performance:
+        cache_performance = processor.get_cache_performance()
+        print("\nCache Performance:")
+        print(f"Pattern Compilation - Hits: {cache_performance['pattern_compilation']['hits']}, "
+              f"Misses: {cache_performance['pattern_compilation']['misses']}, "
+              f"Hit Ratio: {cache_performance['pattern_compilation']['hit_ratio']:.1%}")
+        print(f"PHI Detection - Hits: {cache_performance['phi_detection']['hits']}, "
+              f"Misses: {cache_performance['phi_detection']['misses']}, "
+              f"Hit Ratio: {cache_performance['phi_detection']['hit_ratio']:.1%}")
+        print(f"Cache Memory Usage - Pattern: {cache_performance['pattern_compilation']['current_size']}/{cache_performance['pattern_compilation']['max_size']}, "
+              f"PHI: {cache_performance['phi_detection']['current_size']}/{cache_performance['phi_detection']['max_size']}")
 
 
 if __name__ == "__main__":
