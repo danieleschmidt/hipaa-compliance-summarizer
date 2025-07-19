@@ -1,5 +1,6 @@
 repos:
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
+    rev: v1.5.0
     hooks:
       - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline', '--disable-filter', 'detect_secrets.filters.common.is_ignored_due_to_verification_policies']
