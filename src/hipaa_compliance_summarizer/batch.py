@@ -8,6 +8,7 @@ import logging
 
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
+from .phi import PHIRedactor
 
 
 @dataclass
@@ -115,3 +116,36 @@ class BatchProcessor:
         dash = self.generate_dashboard(results)
         Path(path).write_text(dash.to_json())
         logger.info("Dashboard saved to %s", path)
+
+    def get_cache_performance(self) -> dict:
+        """Get information about PHI detection cache performance."""
+        cache_info = PHIRedactor.get_cache_info()
+        
+        # Calculate cache hit ratios
+        pattern_cache = cache_info["pattern_compilation"]
+        phi_cache = cache_info["phi_detection"]
+        
+        pattern_hit_ratio = pattern_cache.hits / (pattern_cache.hits + pattern_cache.misses) if (pattern_cache.hits + pattern_cache.misses) > 0 else 0
+        phi_hit_ratio = phi_cache.hits / (phi_cache.hits + phi_cache.misses) if (phi_cache.hits + phi_cache.misses) > 0 else 0
+        
+        return {
+            "pattern_compilation": {
+                "hits": pattern_cache.hits,
+                "misses": pattern_cache.misses,
+                "hit_ratio": round(pattern_hit_ratio, 3),
+                "current_size": pattern_cache.currsize,
+                "max_size": pattern_cache.maxsize
+            },
+            "phi_detection": {
+                "hits": phi_cache.hits,
+                "misses": phi_cache.misses,
+                "hit_ratio": round(phi_hit_ratio, 3),
+                "current_size": phi_cache.currsize,
+                "max_size": phi_cache.maxsize
+            }
+        }
+
+    def clear_cache(self) -> None:
+        """Clear PHI detection caches to free memory."""
+        PHIRedactor.clear_cache()
+        logger.info("PHI detection caches cleared")

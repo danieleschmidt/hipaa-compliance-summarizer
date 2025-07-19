@@ -3,6 +3,9 @@ patterns:
   phone: "\\b\\d{3}[.-]\\d{3}[.-]\\d{4}\\b"
   email: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b"
   date: "\\b\\d{2}/\\d{2}/\\d{4}\\b"
+  mrn: "\\b(?:MRN|Medical Record|Patient ID)[:.]?\\s*([A-Z]{0,3}\\d{6,12})\\b"
+  dea: "\\b(?:DEA|DEA#|DEA Number)[:.]?\\s*([A-Z]{2}\\d{7})\\b"
+  insurance_id: "\\b(?:Member ID|Policy|Insurance ID|Subscriber ID)[:.]?\\s*([A-Z0-9]{8,15})\\b"
 scoring:
   penalty_per_entity: 0.01
   penalty_cap: 0.2

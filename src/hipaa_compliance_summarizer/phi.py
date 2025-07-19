@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import hashlib
 import re
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .config import CONFIG
 
@@ -32,6 +33,46 @@ def _compile_pattern(expr: str) -> re.Pattern:
     return re.compile(expr)
 
 
+@lru_cache(maxsize=1000)
+def _detect_phi_cached(text: str, patterns_hash: str, patterns_tuple: Tuple[Tuple[str, str], ...]) -> Tuple[Entity, ...]:
+    """Cache PHI detection results for identical text and pattern combinations.
+    
+    Args:
+        text: The text to analyze
+        patterns_hash: Hash of the pattern configuration for cache invalidation
+        patterns_tuple: Tuple of (name, pattern) pairs for actual detection
+        
+    Returns:
+        Tuple of detected entities (using tuple for hashability)
+    """
+    # Recreate patterns dict from tuple
+    patterns = {name: _compile_pattern(expr) for name, expr in patterns_tuple}
+    
+    entities: List[Entity] = []
+    for etype, pattern in patterns.items():
+        for match in pattern.finditer(text):
+            # If pattern has capturing groups, use the first group; otherwise use the full match
+            if pattern.groups > 0:
+                # For patterns with capturing groups, extract just the captured content
+                captured_value = match.group(1)
+                # Find the position of the captured group within the full match
+                full_match = match.group()
+                captured_start_offset = full_match.find(captured_value)
+                captured_start = match.start() + captured_start_offset
+                captured_end = captured_start + len(captured_value)
+                entities.append(
+                    Entity(etype, captured_value, captured_start, captured_end)
+                )
+            else:
+                # For patterns without capturing groups, use the full match
+                entities.append(
+                    Entity(etype, match.group(), match.start(), match.end())
+                )
+    
+    entities.sort(key=lambda e: e.start)
+    return tuple(entities)
+
+
 class PHIRedactor:
     """Simple PHI detection and redaction utility."""
 
@@ -46,17 +87,17 @@ class PHIRedactor:
                 "date": r"\b\d{2}/\d{2}/\d{4}\b",
             }
         self.patterns = {name: _compile_pattern(expr) for name, expr in raw_patterns.items()}
+        
+        # Create hashable representation for caching
+        self._patterns_tuple = tuple(sorted(raw_patterns.items()))
+        self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode()).hexdigest()
 
     def detect(self, text: str) -> List[Entity]:
         """Detect PHI entities in ``text``."""
-        entities: List[Entity] = []
-        for etype, pattern in self.patterns.items():
-            for match in pattern.finditer(text):
-                entities.append(
-                    Entity(etype, match.group(), match.start(), match.end())
-                )
-        entities.sort(key=lambda e: e.start)
-        return entities
+        # Use cached detection for performance
+        cached_entities = _detect_phi_cached(text, self._patterns_hash, self._patterns_tuple)
+        # Convert back to list for compatibility
+        return list(cached_entities)
 
     def redact(self, text: str) -> RedactionResult:
         """Redact detected PHI from ``text`` and return result."""
@@ -86,3 +127,17 @@ class PHIRedactor:
                 pos += len(chunk)
         combined = "".join(text_parts)
         return RedactionResult(combined, entities)
+
+    @staticmethod
+    def clear_cache():
+        """Clear all PHI detection caches. Useful for testing or memory management."""
+        _compile_pattern.cache_clear()
+        _detect_phi_cached.cache_clear()
+
+    @staticmethod
+    def get_cache_info():
+        """Get information about cache usage for monitoring and debugging."""
+        return {
+            "pattern_compilation": _compile_pattern.cache_info(),
+            "phi_detection": _detect_phi_cached.cache_info()
+        }
