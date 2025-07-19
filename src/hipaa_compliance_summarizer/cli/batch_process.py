@@ -1,10 +1,29 @@
 #!/usr/bin/env python
 """Example script to batch process healthcare documents."""
+import logging
+import sys
 from argparse import ArgumentParser
 from hipaa_compliance_summarizer import BatchProcessor
+from hipaa_compliance_summarizer.startup import validate_environment, setup_logging_with_config
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    # Setup logging first
+    setup_logging_with_config()
+    
+    # Validate environment configuration
+    validation = validate_environment(require_production_secrets=False)
+    if not validation["valid"]:
+        logger.error("Configuration validation failed:")
+        for error in validation["errors"]:
+            logger.error("  - %s", error)
+        sys.exit(1)
+    
+    if validation["warnings"]:
+        for warning in validation["warnings"]:
+            logger.warning(warning)
     parser = ArgumentParser(description="Batch process healthcare documents")
     parser.add_argument("--input-dir", required=True, help="Input directory of documents")
     parser.add_argument("--output-dir", required=True, help="Directory to write processed files")
