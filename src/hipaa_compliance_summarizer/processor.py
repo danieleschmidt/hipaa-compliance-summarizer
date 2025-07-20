@@ -8,11 +8,12 @@ import time
 from pathlib import Path
 from typing import Optional, Union
 
-from .documents import Document, DocumentType
+from .documents import Document, DocumentType, DocumentError, validate_document
 from .parsers import (
     parse_clinical_note,
     parse_insurance_form,
     parse_medical_record,
+    ParsingError,
 )
 
 from .phi import PHIRedactor, RedactionResult
@@ -122,6 +123,13 @@ class HIPAAProcessor:
         
         try:
             if isinstance(document, Document):
+                # Validate the Document object first
+                try:
+                    validate_document(document)
+                except DocumentError as e:
+                    logger.error("Invalid document object: %s", e)
+                    raise RuntimeError(f"Document validation failed: {e}")
+                
                 # For Document objects, validate the file path first
                 try:
                     validated_path = validate_file_for_processing(document.path)
@@ -130,14 +138,20 @@ class HIPAAProcessor:
                     logger.error("Security validation failed for document %s: %s", document.path, e)
                     raise SecurityError(f"Document security validation failed: {e}")
                 
-                if document.type == DocumentType.MEDICAL_RECORD:
-                    text = parse_medical_record(str(validated_path))
-                elif document.type == DocumentType.CLINICAL_NOTE:
-                    text = parse_clinical_note(str(validated_path))
-                elif document.type == DocumentType.INSURANCE_FORM:
-                    text = parse_insurance_form(str(validated_path))
-                else:
-                    text = self._load_text(str(validated_path))
+                # Parse document based on type with error handling
+                try:
+                    if document.type == DocumentType.MEDICAL_RECORD:
+                        text = parse_medical_record(str(validated_path))
+                    elif document.type == DocumentType.CLINICAL_NOTE:
+                        text = parse_clinical_note(str(validated_path))
+                    elif document.type == DocumentType.INSURANCE_FORM:
+                        text = parse_insurance_form(str(validated_path))
+                    else:
+                        # For UNKNOWN type, use generic text loading
+                        text = self._load_text(str(validated_path))
+                except ParsingError as e:
+                    logger.error("Failed to parse document %s: %s", document.path, e)
+                    raise RuntimeError(f"Document parsing failed: {e}")
             else:
                 text = self._load_text(document)
             

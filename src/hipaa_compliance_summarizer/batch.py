@@ -258,18 +258,11 @@ class BatchProcessor:
                         error_type="DocumentTypeError"
                     )
                 
-                # Create document object and process with optimized reading
+                # Create document object and process
                 try:
-                    # Use optimized file reading for better I/O performance
-                    if validated_file.stat().st_size > 0:
-                        # For non-empty files, we can use our optimized reading
-                        content = self._optimized_file_read(validated_file)
-                        # Process the content directly instead of file path
-                        result = self.processor.process_document(content)
-                    else:
-                        # For empty files, use the Document object approach
-                        doc = Document(str(validated_file), doc_type)
-                        result = self.processor.process_document(doc)
+                    # Always create a Document object for consistency
+                    doc = Document(str(validated_file), doc_type)
+                    result = self.processor.process_document(doc)
                 except (IOError, OSError) as e:
                     return ErrorResult(
                         file_path=str(file),
