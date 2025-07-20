@@ -58,10 +58,9 @@ def test_phi_result_cache_size_limit():
     
     redactor = PHIRedactor()
     
-    # Generate many different texts to fill cache - use proper SSN format
+    # Generate many different texts to fill cache
     texts = []
     for i in range(100):  # Reduced number for reasonable test time
-        # Generate valid SSN format: XXX-XX-XXXX
         ssn = f"{123+i:03d}-{45+i%50:02d}-{6789+i:04d}"
         texts.append(f"Patient SSN: {ssn}")
     
