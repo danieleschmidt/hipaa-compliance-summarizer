@@ -5,8 +5,9 @@ import os
 from typing import Dict, Any
 
 from .config import get_secret_config, validate_secret_config, mask_sensitive_config
+from .logging_framework import setup_structured_logging, get_logger_with_metrics, LoggingConfig
 
-logger = logging.getLogger(__name__)
+logger = get_logger_with_metrics(__name__)
 
 
 def validate_environment(require_production_secrets: bool = False) -> Dict[str, Any]:
@@ -39,7 +40,10 @@ def validate_environment(require_production_secrets: bool = False) -> Dict[str, 
         
         # Log configuration status (masked for security)
         masked_config = mask_sensitive_config(secret_config)
-        logger.info("Loaded configuration: %s", masked_config)
+        logger.info("Configuration loaded successfully", {
+            "config": masked_config,
+            "require_production_secrets": require_production_secrets
+        })
         
         # Check for common issues
         if require_production_secrets:
@@ -53,7 +57,10 @@ def validate_environment(require_production_secrets: bool = False) -> Dict[str, 
         critical_errors = [error for error in result["errors"] if "Required secret" in error]
         if critical_errors:
             result["valid"] = False
-            logger.error("Configuration validation failed: %s", critical_errors)
+            logger.error("Configuration validation failed", {
+                "critical_errors": critical_errors,
+                "error_count": len(critical_errors)
+            })
         else:
             result["valid"] = True
             if result["errors"]:  # These are warnings, not critical errors
@@ -61,14 +68,20 @@ def validate_environment(require_production_secrets: bool = False) -> Dict[str, 
                 result["errors"] = critical_errors
             
             if result["warnings"]:
-                logger.warning("Configuration warnings: %s", result["warnings"])
+                logger.warning("Configuration warnings detected", {
+                    "warnings": result["warnings"],
+                    "warning_count": len(result["warnings"])
+                })
             else:
-                logger.info("Configuration validation passed")
+                logger.info("Configuration validation passed successfully")
             
     except Exception as e:
         result["valid"] = False
         result["errors"].append(f"Configuration loading failed: {str(e)}")
-        logger.exception("Failed to load configuration")
+        logger.error("Failed to load configuration", {
+            "error_type": type(e).__name__,
+            "error_message": str(e)
+        }, exc_info=e)
     
     return result
 
@@ -89,21 +102,23 @@ def check_required_environment_for_production():
 
 
 def setup_logging_with_config():
-    """Setup logging configuration based on environment variables."""
-    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-    log_format = os.environ.get("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format=log_format
-    )
+    """Setup structured logging configuration based on environment variables."""
+    config = LoggingConfig.from_environment()
+    metrics_collector = setup_structured_logging(config)
     
     # Suppress noisy loggers in production
     if os.environ.get("ENVIRONMENT") == "production":
         logging.getLogger("urllib3").setLevel(logging.WARNING)
         logging.getLogger("requests").setLevel(logging.WARNING)
     
-    logger.info("Logging configured with level: %s", log_level)
+    logger.info("Structured logging configured successfully", {
+        "log_level": config.level,
+        "output_format": config.output_format,
+        "metrics_enabled": config.enable_metrics,
+        "environment": os.environ.get("ENVIRONMENT", "development")
+    })
+    
+    return metrics_collector
 
 
 def get_environment_info() -> Dict[str, str]:
