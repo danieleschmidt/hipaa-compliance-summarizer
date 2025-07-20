@@ -73,13 +73,21 @@ class TestBatchProcessorFileErrorHandling:
         bad_file = input_dir / "bad.txt"
         bad_file.write_text("Content that will fail")
         
-        with patch('hipaa_compliance_summarizer.documents.Document') as mock_doc:
-            def side_effect(path, doc_type):
-                if "bad.txt" in path:
+        with patch('hipaa_compliance_summarizer.processor.HIPAAProcessor.process_document') as mock_process:
+            def side_effect(document):
+                if "bad.txt" in document.path:
                     raise IOError("File read error")
-                return Mock()
+                # Return a mock ProcessingResult for good files
+                from hipaa_compliance_summarizer.processor import ProcessingResult
+                from hipaa_compliance_summarizer.phi import RedactionResult
+                return ProcessingResult(
+                    summary="Valid content",
+                    compliance_score=1.0,
+                    phi_detected_count=0,
+                    redacted=RedactionResult(text="Valid content", entities=[])
+                )
             
-            mock_doc.side_effect = side_effect
+            mock_process.side_effect = side_effect
             
             # Should continue processing other files even if one fails
             results = processor.process_directory(str(input_dir), output_dir=str(output_dir))
@@ -322,11 +330,11 @@ class TestBatchProcessorResourceManagement:
             test_file = input_dir / f"test_{i}.txt"
             test_file.write_text(f"Content {i}")
         
-        with patch('concurrent.futures.ThreadPoolExecutor') as mock_executor_class:
+        with patch('hipaa_compliance_summarizer.batch.ThreadPoolExecutor') as mock_executor_class:
             mock_executor = Mock()
             mock_executor.__enter__ = Mock(return_value=mock_executor)
             mock_executor.__exit__ = Mock(return_value=None)
-            mock_executor.map.side_effect = RuntimeError("Thread pool error")
+            mock_executor.submit.side_effect = RuntimeError("Thread pool error")
             mock_executor_class.return_value = mock_executor
             
             # Should handle thread pool errors gracefully

@@ -6,6 +6,7 @@ from typing import List, Sequence, Optional, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import os
+import multiprocessing
 
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
@@ -79,9 +80,26 @@ class BatchProcessor:
         compliance_level: Optional[str] = None,
         generate_summaries: bool = False,
         show_progress: bool = False,
-        max_workers: int = 1,
+        max_workers: Optional[int] = None,
     ) -> List[Union[ProcessingResult, ErrorResult]]:
-        """Process all files in ``input_dir`` and optionally write outputs."""
+        """Process all files in ``input_dir`` and optionally write outputs.
+        
+        Args:
+            input_dir: Directory containing files to process
+            output_dir: Optional output directory for processed files
+            compliance_level: HIPAA compliance level (strict/standard/minimal)
+            generate_summaries: Whether to generate summary files
+            show_progress: Whether to display progress information
+            max_workers: Number of worker threads (auto-detected if None)
+        
+        Returns:
+            List of processing results or error results
+        """
+        # Auto-detect optimal worker count if not specified
+        if max_workers is None:
+            max_workers = min(4, max(1, multiprocessing.cpu_count() - 1))
+            logger.info("Auto-detected optimal workers: %d", max_workers)
+        
         # Validate input parameters
         if max_workers <= 0:
             raise ValueError("max_workers must be positive")
@@ -127,6 +145,13 @@ class BatchProcessor:
         if total == 0:
             logger.warning("No files found in input directory: %s", input_dir)
             return results
+
+        # Adaptive worker scaling based on file count
+        if total < max_workers:
+            max_workers = max(1, total)
+            logger.info("Reducing workers to %d for %d files", max_workers, total)
+        
+        logger.info("Processing %d files with %d workers", total, max_workers)
 
         def handle(file: Path) -> Union[ProcessingResult, ErrorResult]:
             """Process a single file with comprehensive error handling."""
