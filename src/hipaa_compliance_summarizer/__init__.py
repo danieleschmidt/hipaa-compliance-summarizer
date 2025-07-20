@@ -8,6 +8,12 @@ from .parsers import (
     parse_clinical_note,
     parse_insurance_form,
 )
+from .security import (
+    SecurityError,
+    validate_file_for_processing,
+    sanitize_filename,
+    get_security_recommendations,
+)
 
 __all__ = [
     "PHIRedactor",
@@ -26,4 +32,8 @@ __all__ = [
     "parse_insurance_form",
     "BatchProcessor",
     "BatchDashboard",
+    "SecurityError",
+    "validate_file_for_processing",
+    "sanitize_filename",
+    "get_security_recommendations",
 ]

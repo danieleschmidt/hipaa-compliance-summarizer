@@ -11,6 +11,7 @@ import multiprocessing
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
 from .phi import PHIRedactor
+from .security import validate_directory_path, validate_file_for_processing, SecurityError, sanitize_filename
 
 
 @dataclass
@@ -113,25 +114,44 @@ class BatchProcessor:
 
         results: List[Union[ProcessingResult, ErrorResult]] = []
         
-        # Validate input directory
+        # Validate input directory with security checks
         try:
-            in_path = Path(input_dir)
-            if not in_path.exists():
+            in_path = validate_directory_path(input_dir)
+        except SecurityError as e:
+            # Convert SecurityError to appropriate exception type for backward compatibility
+            error_msg = str(e)
+            if "does not exist" in error_msg:
                 raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
-            if not in_path.is_dir():
+            elif "not a directory" in error_msg:
                 raise ValueError(f"Input path is not a directory: {input_dir}")
-        except FileNotFoundError:
-            # Re-raise FileNotFoundError as-is
-            raise
+            elif "not readable" in error_msg:
+                raise PermissionError(f"Permission denied accessing input directory: {input_dir}")
+            else:
+                raise ValueError(f"Security validation failed for input directory: {e}")
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Permission denied accessing input directory: {e}")
         
-        # Setup output directory if specified
+        # Setup output directory if specified with security validation
         out_path = None
         if output_dir:
             try:
+                # Validate the parent directory path for security
+                output_parent = str(Path(output_dir).parent)
+                if output_parent != '.':
+                    validate_directory_path(output_parent)
+                
                 out_path = Path(output_dir)
                 out_path.mkdir(parents=True, exist_ok=True)
+                
+                # Validate the created directory
+                validate_directory_path(str(out_path))
+                
+            except SecurityError as e:
+                # Only reject truly dangerous paths, allow reasonable directories to be created
+                if "dangerous path pattern" in str(e):
+                    raise ValueError(f"Security validation failed for output directory: {e}")
+                # For other security errors, try to proceed but log a warning
+                logger.warning("Output directory security check: %s", e)
             except (OSError, PermissionError) as e:
                 raise PermissionError(f"Cannot create output directory: {e}")
 
@@ -158,9 +178,19 @@ class BatchProcessor:
             try:
                 logger.info("Processing file %s", file)
                 
+                # Security validation first
+                try:
+                    validated_file = validate_file_for_processing(str(file))
+                except SecurityError as e:
+                    return ErrorResult(
+                        file_path=str(file),
+                        error=f"Security validation failed: {e}",
+                        error_type="SecurityError"
+                    )
+                
                 # Detect document type
                 try:
-                    doc_type = detect_document_type(file.name)
+                    doc_type = detect_document_type(validated_file.name)
                 except Exception as e:
                     return ErrorResult(
                         file_path=str(file),
@@ -170,7 +200,7 @@ class BatchProcessor:
                 
                 # Create document object and process
                 try:
-                    doc = Document(str(file), doc_type)
+                    doc = Document(str(validated_file), doc_type)
                     result = self.processor.process_document(doc)
                 except (IOError, OSError) as e:
                     return ErrorResult(
@@ -194,7 +224,17 @@ class BatchProcessor:
                 # Write output files if output directory specified
                 if out_path:
                     try:
-                        out_file = out_path / file.name
+                        # Sanitize filename for security
+                        safe_filename = sanitize_filename(validated_file.name)
+                        out_file = out_path / safe_filename
+                        
+                        # Ensure we don't overwrite existing files
+                        counter = 1
+                        while out_file.exists():
+                            name, ext = os.path.splitext(safe_filename)
+                            out_file = out_path / f"{name}_{counter}{ext}"
+                            counter += 1
+                        
                         out_file.write_text(result.redacted.text)
                         
                         if generate_summaries:

@@ -28,13 +28,10 @@ class TestBatchProcessorFileErrorHandling:
         """Test handling of input directory permission errors."""
         processor = BatchProcessor()
         
-        # Mock the Path class within the batch module
-        with patch('hipaa_compliance_summarizer.batch.Path') as mock_path:
-            mock_path_instance = Mock()
-            mock_path_instance.exists.return_value = True
-            mock_path_instance.is_dir.return_value = True
-            mock_path_instance.iterdir.side_effect = PermissionError("Access denied")
-            mock_path.return_value = mock_path_instance
+        # Mock the validate_directory_path function to simulate permission error
+        with patch('hipaa_compliance_summarizer.batch.validate_directory_path') as mock_validate:
+            from hipaa_compliance_summarizer.security import SecurityError
+            mock_validate.side_effect = SecurityError("Directory is not readable: /restricted/directory")
             
             with pytest.raises(PermissionError) as exc_info:
                 processor.process_directory("/restricted/directory")
@@ -51,11 +48,12 @@ class TestBatchProcessorFileErrorHandling:
         test_file = input_dir / "test.txt"
         test_file.write_text("Sample content")
         
+        # Use a valid path but mock mkdir to simulate permission error
         with patch('pathlib.Path.mkdir') as mock_mkdir:
             mock_mkdir.side_effect = PermissionError("Cannot create directory")
             
             with pytest.raises(PermissionError) as exc_info:
-                processor.process_directory(str(input_dir), output_dir="/restricted/output")
+                processor.process_directory(str(input_dir), output_dir=str(tmp_path / "restricted_output"))
             
             assert "Cannot create output directory" in str(exc_info.value)
 
@@ -140,7 +138,10 @@ class TestBatchProcessorFileErrorHandling:
         assert len(results) == 1
         # Should either process successfully or record error
         if hasattr(results[0], 'error'):
-            assert "encoding" in results[0].error.lower() or "decode" in results[0].error.lower()
+            # With security validation, .bin files are rejected due to extension
+            assert any(phrase in results[0].error.lower() for phrase in [
+                "encoding", "decode", "extension", "not allowed", "security validation"
+            ])
 
     def test_process_directory_handles_concurrent_processing_errors(self, tmp_path):
         """Test error handling with multiple workers and concurrent failures."""
@@ -432,4 +433,7 @@ class TestBatchProcessorValidation:
         # Check that unsupported files are either skipped or marked with errors
         for result in results:
             if hasattr(result, 'error'):
-                assert "unsupported" in result.error.lower() or "binary" in result.error.lower()
+                # Should mention extension not allowed or security validation
+                assert any(phrase in result.error.lower() for phrase in [
+                    "unsupported", "binary", "extension", "not allowed", "security validation"
+                ])
