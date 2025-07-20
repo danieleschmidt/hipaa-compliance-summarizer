@@ -28,13 +28,10 @@ class TestBatchProcessorFileErrorHandling:
         """Test handling of input directory permission errors."""
         processor = BatchProcessor()
         
-        # Mock the Path class within the batch module
-        with patch('hipaa_compliance_summarizer.batch.Path') as mock_path:
-            mock_path_instance = Mock()
-            mock_path_instance.exists.return_value = True
-            mock_path_instance.is_dir.return_value = True
-            mock_path_instance.iterdir.side_effect = PermissionError("Access denied")
-            mock_path.return_value = mock_path_instance
+        # Mock the validate_directory_path function to simulate permission error
+        with patch('hipaa_compliance_summarizer.batch.validate_directory_path') as mock_validate:
+            from hipaa_compliance_summarizer.security import SecurityError
+            mock_validate.side_effect = SecurityError("Directory is not readable: /restricted/directory")
             
             with pytest.raises(PermissionError) as exc_info:
                 processor.process_directory("/restricted/directory")
@@ -51,11 +48,12 @@ class TestBatchProcessorFileErrorHandling:
         test_file = input_dir / "test.txt"
         test_file.write_text("Sample content")
         
+        # Use a valid path but mock mkdir to simulate permission error
         with patch('pathlib.Path.mkdir') as mock_mkdir:
             mock_mkdir.side_effect = PermissionError("Cannot create directory")
             
             with pytest.raises(PermissionError) as exc_info:
-                processor.process_directory(str(input_dir), output_dir="/restricted/output")
+                processor.process_directory(str(input_dir), output_dir=str(tmp_path / "restricted_output"))
             
             assert "Cannot create output directory" in str(exc_info.value)
 
@@ -73,13 +71,21 @@ class TestBatchProcessorFileErrorHandling:
         bad_file = input_dir / "bad.txt"
         bad_file.write_text("Content that will fail")
         
-        with patch('hipaa_compliance_summarizer.documents.Document') as mock_doc:
-            def side_effect(path, doc_type):
-                if "bad.txt" in path:
+        with patch('hipaa_compliance_summarizer.processor.HIPAAProcessor.process_document') as mock_process:
+            def side_effect(document):
+                if "bad.txt" in document.path:
                     raise IOError("File read error")
-                return Mock()
+                # Return a mock ProcessingResult for good files
+                from hipaa_compliance_summarizer.processor import ProcessingResult
+                from hipaa_compliance_summarizer.phi import RedactionResult
+                return ProcessingResult(
+                    summary="Valid content",
+                    compliance_score=1.0,
+                    phi_detected_count=0,
+                    redacted=RedactionResult(text="Valid content", entities=[])
+                )
             
-            mock_doc.side_effect = side_effect
+            mock_process.side_effect = side_effect
             
             # Should continue processing other files even if one fails
             results = processor.process_directory(str(input_dir), output_dir=str(output_dir))
@@ -132,7 +138,10 @@ class TestBatchProcessorFileErrorHandling:
         assert len(results) == 1
         # Should either process successfully or record error
         if hasattr(results[0], 'error'):
-            assert "encoding" in results[0].error.lower() or "decode" in results[0].error.lower()
+            # With security validation, .bin files are rejected due to extension
+            assert any(phrase in results[0].error.lower() for phrase in [
+                "encoding", "decode", "extension", "not allowed", "security validation"
+            ])
 
     def test_process_directory_handles_concurrent_processing_errors(self, tmp_path):
         """Test error handling with multiple workers and concurrent failures."""
@@ -322,11 +331,11 @@ class TestBatchProcessorResourceManagement:
             test_file = input_dir / f"test_{i}.txt"
             test_file.write_text(f"Content {i}")
         
-        with patch('concurrent.futures.ThreadPoolExecutor') as mock_executor_class:
+        with patch('hipaa_compliance_summarizer.batch.ThreadPoolExecutor') as mock_executor_class:
             mock_executor = Mock()
             mock_executor.__enter__ = Mock(return_value=mock_executor)
             mock_executor.__exit__ = Mock(return_value=None)
-            mock_executor.map.side_effect = RuntimeError("Thread pool error")
+            mock_executor.submit.side_effect = RuntimeError("Thread pool error")
             mock_executor_class.return_value = mock_executor
             
             # Should handle thread pool errors gracefully
@@ -424,4 +433,7 @@ class TestBatchProcessorValidation:
         # Check that unsupported files are either skipped or marked with errors
         for result in results:
             if hasattr(result, 'error'):
-                assert "unsupported" in result.error.lower() or "binary" in result.error.lower()
+                # Should mention extension not allowed or security validation
+                assert any(phrase in result.error.lower() for phrase in [
+                    "unsupported", "binary", "extension", "not allowed", "security validation"
+                ])
