@@ -7,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import os
 import multiprocessing
+import mmap
+from typing import Iterator
 
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
@@ -72,6 +74,58 @@ class BatchProcessor:
 
     def __init__(self, compliance_level: ComplianceLevel = ComplianceLevel.STANDARD) -> None:
         self.processor = HIPAAProcessor(compliance_level=compliance_level)
+        self._file_content_cache = {}  # Simple LRU-style cache for file contents
+        self._max_cache_size = 50  # Limit cache to 50 files to prevent memory issues
+
+    def _optimized_file_read(self, file_path: Path) -> str:
+        """Optimized file reading with caching and memory mapping for large files."""
+        file_key = str(file_path)
+        
+        # Check cache first
+        if file_key in self._file_content_cache:
+            return self._file_content_cache[file_key]
+        
+        file_size = file_path.stat().st_size
+        
+        # For small files (< 1MB), use regular read with caching
+        if file_size < 1024 * 1024:
+            content = file_path.read_text(encoding='utf-8', errors='ignore')
+            
+            # Manage cache size
+            if len(self._file_content_cache) >= self._max_cache_size:
+                # Remove oldest entry (simple FIFO)
+                oldest_key = next(iter(self._file_content_cache))
+                del self._file_content_cache[oldest_key]
+            
+            self._file_content_cache[file_key] = content
+            return content
+        
+        # For large files (>= 1MB), use memory mapping
+        try:
+            with open(file_path, 'rb') as f:
+                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    content = mm.read().decode('utf-8', errors='ignore')
+            return content
+        except (OSError, ValueError):
+            # Fallback to regular read if mmap fails
+            return file_path.read_text(encoding='utf-8', errors='ignore')
+
+    def _batch_file_iterator(self, files: List[Path], batch_size: int = 5) -> Iterator[List[Path]]:
+        """Yield batches of files for processing."""
+        for i in range(0, len(files), batch_size):
+            yield files[i:i + batch_size]
+
+    def _preload_files(self, files: List[Path]) -> None:
+        """Preload small files into cache to reduce I/O during processing."""
+        small_files = [f for f in files if f.stat().st_size < 512 * 1024]  # < 512KB
+        
+        if small_files:
+            logger.info("Preloading %d small files into cache", len(small_files))
+            for file_path in small_files[:self._max_cache_size]:
+                try:
+                    self._optimized_file_read(file_path)
+                except Exception as e:
+                    logger.warning("Failed to preload file %s: %s", file_path, e)
 
     def process_directory(
         self,
@@ -166,6 +220,12 @@ class BatchProcessor:
             logger.warning("No files found in input directory: %s", input_dir)
             return results
 
+        # Sort files by size for better processing order (small files first)
+        files.sort(key=lambda f: f.stat().st_size)
+        
+        # Preload small files into cache for faster access
+        self._preload_files(files)
+
         # Adaptive worker scaling based on file count
         if total < max_workers:
             max_workers = max(1, total)
@@ -198,10 +258,18 @@ class BatchProcessor:
                         error_type="DocumentTypeError"
                     )
                 
-                # Create document object and process
+                # Create document object and process with optimized reading
                 try:
-                    doc = Document(str(validated_file), doc_type)
-                    result = self.processor.process_document(doc)
+                    # Use optimized file reading for better I/O performance
+                    if validated_file.stat().st_size > 0:
+                        # For non-empty files, we can use our optimized reading
+                        content = self._optimized_file_read(validated_file)
+                        # Process the content directly instead of file path
+                        result = self.processor.process_document(content)
+                    else:
+                        # For empty files, use the Document object approach
+                        doc = Document(str(validated_file), doc_type)
+                        result = self.processor.process_document(doc)
                 except (IOError, OSError) as e:
                     return ErrorResult(
                         file_path=str(file),
@@ -442,10 +510,19 @@ class BatchProcessor:
             }
 
     def clear_cache(self) -> None:
-        """Clear PHI detection caches to free memory."""
+        """Clear PHI detection caches and file content cache to free memory."""
         try:
             PHIRedactor.clear_cache()
-            logger.info("PHI detection caches cleared")
+            self._file_content_cache.clear()
+            logger.info("PHI detection and file content caches cleared")
         except Exception as e:
             logger.error("Failed to clear cache: %s", e)
             raise RuntimeError(f"Failed to clear cache: {e}")
+
+    def get_file_cache_info(self) -> dict:
+        """Get information about file content cache performance."""
+        return {
+            "file_cache_size": len(self._file_content_cache),
+            "file_cache_max_size": self._max_cache_size,
+            "file_cache_usage_ratio": len(self._file_content_cache) / self._max_cache_size if self._max_cache_size > 0 else 0.0
+        }
