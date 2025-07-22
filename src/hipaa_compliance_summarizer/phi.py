@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
 import re
+import time
 from typing import Dict, List, Tuple, Optional
 import logging
 
@@ -81,7 +82,8 @@ class PHIRedactor:
     """Advanced PHI detection and redaction utility with modular pattern support."""
 
     def __init__(self, mask: str = "[REDACTED]", patterns: Dict[str, str] | None = None, 
-                 pattern_config: Optional[PHIPatternConfig] = None) -> None:
+                 pattern_config: Optional[PHIPatternConfig] = None,
+                 performance_monitor: Optional[object] = None) -> None:
         """
         Initialize PHI redactor with flexible pattern configuration.
         
@@ -89,8 +91,10 @@ class PHIRedactor:
             mask: String to replace detected PHI with
             patterns: Legacy dict of pattern name -> regex string (for backward compatibility)
             pattern_config: Optional custom pattern configuration
+            performance_monitor: Optional performance monitor for metrics collection
         """
         self.mask = mask
+        self.performance_monitor = performance_monitor
         
         # Initialize pattern manager if not already done
         if not pattern_manager._default_patterns_loaded:
@@ -121,8 +125,36 @@ class PHIRedactor:
 
     def detect(self, text: str) -> List[Entity]:
         """Detect PHI entities in ``text``."""
+        start_time = time.time() if self.performance_monitor else None
+        
+        # Check cache first for monitoring purposes
+        cache_key = (text, self._patterns_hash, self._patterns_tuple)
+        cache_hit = _detect_phi_cached.cache_info().hits
+        
         # Use cached detection for performance
         cached_entities = _detect_phi_cached(text, self._patterns_hash, self._patterns_tuple)
+        
+        # Record performance metrics if monitor is available
+        if self.performance_monitor and start_time:
+            detection_time = time.time() - start_time
+            was_cache_hit = _detect_phi_cached.cache_info().hits > cache_hit
+            
+            # Record metrics for each pattern that had matches
+            entity_types = {entity.type for entity in cached_entities}
+            for pattern_name in entity_types:
+                # Get average confidence for this pattern from pattern manager
+                pattern_configs = pattern_manager.get_all_patterns()
+                # Get confidence from pattern config or use default
+                pattern_config = pattern_configs.get(pattern_name)
+                confidence = pattern_config.confidence_threshold if pattern_config else 0.95
+                
+                self.performance_monitor.record_pattern_performance(
+                    pattern_name,
+                    detection_time / len(entity_types),  # Distribute time across matching patterns
+                    was_cache_hit,
+                    confidence
+                )
+        
         # Convert back to list for compatibility
         return list(cached_entities)
 
