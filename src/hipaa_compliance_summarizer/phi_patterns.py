@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import re
 import logging
+import hashlib
+import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, List, Optional, Union, Pattern
 from pathlib import Path
 import yaml
@@ -83,6 +86,9 @@ class PHIPatternManager:
     def __init__(self):
         self.categories: Dict[str, PHIPatternCategory] = {}
         self._default_patterns_loaded = False
+        self._pattern_hash_cache = {}  # Cache for pattern set hashes
+        self._validation_cache = {}    # Cache for validation results
+        self._stats_cache = {"data": None, "timestamp": 0, "ttl": 60}  # 60 second TTL
         
     def load_default_patterns(self) -> None:
         """Load the default set of PHI patterns."""
@@ -211,17 +217,30 @@ class PHIPatternManager:
             return {}
         return self.categories[category].get_enabled_patterns()
     
-    def get_compiled_patterns(self) -> Dict[str, Pattern]:
-        """Get compiled regex patterns for performance."""
+    @lru_cache(maxsize=32)
+    def get_compiled_patterns_cached(self, patterns_hash: str) -> Dict[str, Pattern]:
+        """Get compiled regex patterns with LRU caching based on pattern hash."""
         patterns = self.get_all_patterns()
         return {name: pattern.compiled_pattern for name, pattern in patterns.items() 
                 if pattern.compiled_pattern is not None}
+    
+    def get_compiled_patterns(self) -> Dict[str, Pattern]:
+        """Get compiled regex patterns for performance."""
+        # Create hash of current pattern configuration for cache key
+        patterns = self.get_all_patterns()
+        pattern_repr = str(sorted([(name, config.pattern, config.enabled) 
+                                  for name, config in patterns.items()]))
+        patterns_hash = hashlib.md5(pattern_repr.encode()).hexdigest()
+        
+        return self.get_compiled_patterns_cached(patterns_hash)
     
     def disable_pattern(self, pattern_name: str) -> bool:
         """Disable a specific pattern by name."""
         for category in self.categories.values():
             if pattern_name in category.patterns:
                 category.patterns[pattern_name].enabled = False
+                # Clear caches when pattern state changes
+                self._clear_pattern_caches()
                 logger.info(f"Disabled pattern '{pattern_name}'")
                 return True
         return False
@@ -231,12 +250,24 @@ class PHIPatternManager:
         for category in self.categories.values():
             if pattern_name in category.patterns:
                 category.patterns[pattern_name].enabled = True
+                # Clear caches when pattern state changes
+                self._clear_pattern_caches()
                 logger.info(f"Enabled pattern '{pattern_name}'")
                 return True
         return False
     
     def validate_all_patterns(self) -> List[str]:
-        """Validate all patterns and return any validation errors."""
+        """Validate all patterns and return any validation errors with caching."""
+        # Create cache key from current pattern state
+        pattern_repr = str(sorted([(name, config.pattern) 
+                                  for category in self.categories.values()
+                                  for name, config in category.patterns.items()]))
+        validation_key = hashlib.md5(pattern_repr.encode()).hexdigest()
+        
+        # Check cache first
+        if validation_key in self._validation_cache:
+            return self._validation_cache[validation_key]
+        
         errors = []
         for category_name, category in self.categories.items():
             for pattern_name, pattern in category.patterns.items():
@@ -244,10 +275,21 @@ class PHIPatternManager:
                     pattern.validate()
                 except ValueError as e:
                     errors.append(f"Category '{category_name}', Pattern '{pattern_name}': {e}")
+        
+        # Cache the result
+        self._validation_cache[validation_key] = errors
         return errors
     
     def get_pattern_statistics(self) -> Dict[str, int]:
-        """Get statistics about loaded patterns."""
+        """Get statistics about loaded patterns with TTL caching."""
+        current_time = time.time()
+        
+        # Check if cached data is still valid
+        if (self._stats_cache["data"] is not None and 
+            current_time - self._stats_cache["timestamp"] < self._stats_cache["ttl"]):
+            return self._stats_cache["data"]
+        
+        # Calculate fresh statistics
         stats = {
             "total_categories": len(self.categories),
             "total_patterns": 0,
@@ -259,6 +301,10 @@ class PHIPatternManager:
             stats["total_patterns"] += len(category.patterns)
             stats["enabled_patterns"] += len(category.get_enabled_patterns())
             stats["disabled_patterns"] += len(category.patterns) - len(category.get_enabled_patterns())
+        
+        # Cache the result with timestamp
+        self._stats_cache["data"] = stats
+        self._stats_cache["timestamp"] = current_time
         
         return stats
     
@@ -275,6 +321,47 @@ class PHIPatternManager:
             return "core"
         else:
             return "custom"
+    
+    @lru_cache(maxsize=16)
+    def get_patterns_by_category_cached(self, category: str, patterns_hash: str) -> Dict[str, PHIPatternConfig]:
+        """Get enabled patterns for a category with caching based on configuration hash."""
+        if category not in self.categories:
+            return {}
+        return self.categories[category].get_enabled_patterns()
+    
+    def get_patterns_by_category(self, category: str) -> Dict[str, PHIPatternConfig]:
+        """Get all enabled patterns in a specific category with caching."""
+        # Create hash for cache invalidation
+        if category in self.categories:
+            category_patterns = self.categories[category].patterns
+            pattern_repr = str(sorted([(name, config.enabled, config.pattern) 
+                                     for name, config in category_patterns.items()]))
+            patterns_hash = hashlib.md5(pattern_repr.encode()).hexdigest()
+            return self.get_patterns_by_category_cached(category, patterns_hash)
+        return {}
+    
+    def _clear_pattern_caches(self) -> None:
+        """Clear all pattern-related caches when patterns are modified."""
+        self.get_compiled_patterns_cached.cache_clear()
+        self.get_patterns_by_category_cached.cache_clear()
+        self._validation_cache.clear()
+        self._stats_cache["data"] = None
+        logger.debug("Cleared pattern caches after configuration change")
+    
+    def clear_all_caches(self) -> None:
+        """Clear all caches manually. Useful for testing or memory management."""
+        self._clear_pattern_caches()
+        logger.info("All pattern manager caches cleared")
+    
+    def get_cache_info(self) -> Dict[str, Dict]:
+        """Get cache statistics for monitoring and debugging."""
+        return {
+            "compiled_patterns": self.get_compiled_patterns_cached.cache_info()._asdict(),
+            "category_patterns": self.get_patterns_by_category_cached.cache_info()._asdict(),
+            "validation_cache_size": len(self._validation_cache),
+            "stats_cache_valid": (self._stats_cache["data"] is not None and 
+                                time.time() - self._stats_cache["timestamp"] < self._stats_cache["ttl"])
+        }
 
 
 # Global pattern manager instance

@@ -8,8 +8,9 @@ The PHI detection system now includes multi-level caching to reduce computationa
 
 1. **Pattern Compilation Caching**: Regex patterns are compiled once and reused
 2. **Detection Result Caching**: Identical text chunks return cached detection results
-3. **Memory Management**: Configurable cache sizes with LRU eviction
-4. **Performance Monitoring**: Built-in metrics and reporting
+3. **Pattern Manager Caching**: Advanced caching for pattern configurations and metadata
+4. **Memory Management**: Configurable cache sizes with LRU eviction
+5. **Performance Monitoring**: Built-in metrics and reporting
 
 ## Cache Levels
 
@@ -39,6 +40,37 @@ def _detect_phi_cached(text: str, patterns_hash: str, patterns_tuple: Tuple[Tupl
 - Caches detection results for identical text
 - Handles different pattern configurations
 - Configurable cache size (default: 1000 entries)
+
+### Level 3: Pattern Manager Caching
+
+The enhanced pattern manager includes multiple specialized caches:
+
+```python
+# Compiled pattern caching with hash-based invalidation
+@lru_cache(maxsize=32)
+def get_compiled_patterns_cached(self, patterns_hash: str) -> Dict[str, Pattern]:
+    """Cache compiled patterns with configuration-based invalidation."""
+
+# Category-specific pattern caching
+@lru_cache(maxsize=16) 
+def get_patterns_by_category_cached(self, category: str, patterns_hash: str) -> Dict[str, PHIPatternConfig]:
+    """Cache patterns by category with hash-based invalidation."""
+
+# Validation result caching
+def validate_all_patterns(self) -> List[str]:
+    """Cache pattern validation results."""
+
+# Statistics caching with TTL
+def get_pattern_statistics(self) -> Dict[str, int]:
+    """Cache statistics for 60 seconds."""
+```
+
+**Benefits:**
+- **Compiled Pattern Cache**: Avoids recompilation when pattern sets are reused
+- **Category Cache**: Speeds up category-specific pattern retrieval
+- **Validation Cache**: Caches validation results until patterns change
+- **Statistics Cache**: Reduces computational overhead with TTL-based invalidation
+- **Hash-based Invalidation**: Ensures cache consistency when patterns change
 
 ## Performance Improvements
 
