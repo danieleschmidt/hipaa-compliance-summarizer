@@ -8,7 +8,8 @@ import logging
 import os
 import multiprocessing
 import mmap
-from typing import Iterator
+import json
+from typing import Iterator, Dict
 
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
@@ -72,10 +73,16 @@ logger = logging.getLogger(__name__)
 class BatchProcessor:
     """Process directories of healthcare documents."""
 
-    def __init__(self, compliance_level: ComplianceLevel = ComplianceLevel.STANDARD) -> None:
+    def __init__(self, compliance_level: ComplianceLevel = ComplianceLevel.STANDARD,
+                 performance_monitor: Optional[object] = None) -> None:
         self.processor = HIPAAProcessor(compliance_level=compliance_level)
         self._file_content_cache = {}  # Simple LRU-style cache for file contents
         self._max_cache_size = 50  # Limit cache to 50 files to prevent memory issues
+        self.performance_monitor = performance_monitor
+        
+        # Set up processor with monitoring if available
+        if performance_monitor and hasattr(self.processor, 'phi_redactor'):
+            self.processor.phi_redactor.performance_monitor = performance_monitor
 
     def _optimized_file_read(self, file_path: Path) -> str:
         """Optimized file reading with caching and memory mapping for large files."""
@@ -235,6 +242,12 @@ class BatchProcessor:
 
         def handle(file: Path) -> Union[ProcessingResult, ErrorResult]:
             """Process a single file with comprehensive error handling."""
+            document_id = str(file)
+            
+            # Start performance monitoring
+            if self.performance_monitor:
+                self.performance_monitor.start_document_processing(document_id)
+            
             try:
                 logger.info("Processing file %s", file)
                 
@@ -242,21 +255,31 @@ class BatchProcessor:
                 try:
                     validated_file = validate_file_for_processing(str(file))
                 except SecurityError as e:
-                    return ErrorResult(
+                    error_result = ErrorResult(
                         file_path=str(file),
                         error=f"Security validation failed: {e}",
                         error_type="SecurityError"
                     )
+                    if self.performance_monitor:
+                        self.performance_monitor.end_document_processing(
+                            document_id, success=False, error=error_result.error
+                        )
+                    return error_result
                 
                 # Detect document type
                 try:
                     doc_type = detect_document_type(validated_file.name)
                 except Exception as e:
-                    return ErrorResult(
+                    error_result = ErrorResult(
                         file_path=str(file),
                         error=f"Failed to detect document type: {e}",
                         error_type="DocumentTypeError"
                     )
+                    if self.performance_monitor:
+                        self.performance_monitor.end_document_processing(
+                            document_id, success=False, error=error_result.error
+                        )
+                    return error_result
                 
                 # Create document object and process
                 try:
@@ -264,23 +287,38 @@ class BatchProcessor:
                     doc = Document(str(validated_file), doc_type)
                     result = self.processor.process_document(doc)
                 except (IOError, OSError) as e:
-                    return ErrorResult(
+                    error_result = ErrorResult(
                         file_path=str(file),
                         error=f"File read error: {e}",
                         error_type="FileReadError"
                     )
+                    if self.performance_monitor:
+                        self.performance_monitor.end_document_processing(
+                            document_id, success=False, error=error_result.error
+                        )
+                    return error_result
                 except MemoryError as e:
-                    return ErrorResult(
+                    error_result = ErrorResult(
                         file_path=str(file),
                         error=f"Out of memory: {e}",
                         error_type="MemoryError"
                     )
+                    if self.performance_monitor:
+                        self.performance_monitor.end_document_processing(
+                            document_id, success=False, error=error_result.error
+                        )
+                    return error_result
                 except Exception as e:
-                    return ErrorResult(
+                    error_result = ErrorResult(
                         file_path=str(file),
                         error=f"Processing error: {e}",
                         error_type="ProcessingError"
                     )
+                    if self.performance_monitor:
+                        self.performance_monitor.end_document_processing(
+                            document_id, success=False, error=error_result.error
+                        )
+                    return error_result
                 
                 # Write output files if output directory specified
                 if out_path:
@@ -302,21 +340,37 @@ class BatchProcessor:
                             summary_file = out_file.with_suffix(out_file.suffix + ".summary.txt")
                             summary_file.write_text(result.summary)
                     except (IOError, OSError, PermissionError) as e:
-                        return ErrorResult(
+                        error_result = ErrorResult(
                             file_path=str(file),
                             error=f"Cannot write file: {e}",
                             error_type="FileWriteError"
                         )
+                        if self.performance_monitor:
+                            self.performance_monitor.end_document_processing(
+                                document_id, success=False, error=error_result.error
+                            )
+                        return error_result
+                
+                # Successfully processed - record metrics
+                if self.performance_monitor:
+                    self.performance_monitor.end_document_processing(
+                        document_id, success=True, result=result
+                    )
                 
                 return result
                 
             except Exception as e:
                 # Catch-all for any unexpected errors
-                return ErrorResult(
+                error_result = ErrorResult(
                     file_path=str(file),
                     error=f"Unexpected error: {e}",
                     error_type="UnexpectedError"
                 )
+                if self.performance_monitor:
+                    self.performance_monitor.end_document_processing(
+                        document_id, success=False, error=error_result.error
+                    )
+                return error_result
 
         # Process files with thread pool and error handling
         processed = 0
@@ -424,6 +478,32 @@ class BatchProcessor:
                 raise OSError(f"Failed to write dashboard to {path_str}: {e}")
         except Exception as e:
             raise RuntimeError(f"Unexpected error saving dashboard to {path_str}: {e}")
+    
+    def generate_performance_dashboard(self) -> Optional[Dict]:
+        """Generate enhanced performance dashboard with monitoring data."""
+        if not self.performance_monitor:
+            return None
+        
+        from .monitoring import MonitoringDashboard
+        dashboard = MonitoringDashboard(self.performance_monitor)
+        return dashboard.generate_dashboard_data()
+    
+    def save_performance_dashboard(self, path: Union[str, Path]) -> None:
+        """Save enhanced performance dashboard to JSON file."""
+        if not self.performance_monitor:
+            logger.warning("No performance monitor available - cannot save performance dashboard")
+            return
+        
+        dashboard_data = self.generate_performance_dashboard()
+        if dashboard_data:
+            path_str = str(path)
+            try:
+                dashboard_path = Path(path_str)
+                dashboard_path.write_text(json.dumps(dashboard_data, indent=2, default=str))
+                logger.info("Performance dashboard saved to %s", path_str)
+            except Exception as e:
+                logger.error(f"Failed to save performance dashboard: {e}")
+                raise
 
     def get_cache_performance(self) -> dict:
         """Get information about PHI detection cache performance."""
