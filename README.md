@@ -30,7 +30,8 @@ hipaa-batch-process \
   --compliance-level standard \
   --generate-summaries \
   --show-dashboard \
-  --dashboard-json dashboard.json
+  --dashboard-json dashboard.json \
+  --show-cache-performance
 
 # Example dashboard output
 Documents processed: 20
@@ -40,6 +41,77 @@ Total PHI detected: 75
 # Generate compliance report
 hipaa-compliance-report --audit-period "2024-Q1"
 ```
+
+## CLI Reference
+
+### hipaa-summarize
+Process a single medical document for PHI detection and redaction.
+
+```bash
+hipaa-summarize --file <document> [--compliance-level <level>]
+```
+
+**Options:**
+- `--file` (required): Path to the document to process
+- `--compliance-level`: Compliance strictness level (choices: `strict`, `standard`, `minimal`; default: `standard`)
+
+### hipaa-batch-process  
+Batch process multiple healthcare documents with advanced options.
+
+```bash
+hipaa-batch-process --input-dir <dir> --output-dir <dir> [options]
+```
+
+**Required Options:**
+- `--input-dir`: Input directory containing documents to process
+- `--output-dir`: Output directory for processed documents
+
+**Optional Parameters:**
+- `--compliance-level`: Compliance level (`strict`, `standard`, `minimal`; default: `standard`)
+- `--generate-summaries`: Generate summary files alongside redacted documents
+- `--show-dashboard`: Display batch processing summary after completion
+- `--dashboard-json <file>`: Save dashboard summary to JSON file
+- `--show-cache-performance`: Display cache performance metrics after processing
+
+**Cache Performance Output:**
+When using `--show-cache-performance`, displays:
+```
+Cache Performance:
+Pattern Compilation - Hits: 145, Misses: 12, Hit Ratio: 92.4%
+PHI Detection - Hits: 89, Misses: 23, Hit Ratio: 79.5%  
+Cache Memory Usage - Pattern: 12/∞, PHI: 67/1000
+```
+
+### hipaa-compliance-report
+Generate compliance reports for audit periods.
+
+```bash
+hipaa-compliance-report --audit-period <period> [options]
+```
+
+**Required Options:**
+- `--audit-period`: Reporting period (e.g., "2024-Q1", "2024-01")
+
+**Optional Parameters:**
+- `--documents-processed <number>`: Number of documents processed (default: 0)
+- `--include-recommendations`: Include compliance recommendations in output
+
+## Environment Configuration
+
+The CLI tools automatically validate the environment configuration before processing:
+
+```bash
+# Environment validation checks:
+# ✓ Required configuration files present
+# ✓ PHI pattern configurations valid
+# ✓ Logging framework properly configured
+# ⚠ Optional: Production secrets (warnings for development)
+```
+
+**Configuration Sources:**
+- `config/hipaa_config.yml`: Main configuration file
+- Environment variables: `HIPAA_CONFIG_PATH`, `HIPAA_CONFIG_YAML`
+- Logging configuration via structured logging framework
 
 ## HIPAA Compliance Features
 

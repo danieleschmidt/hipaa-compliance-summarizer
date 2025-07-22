@@ -192,14 +192,23 @@ class PHIRedactor:
         """Clear all PHI detection caches. Useful for testing or memory management."""
         _compile_pattern.cache_clear()
         _detect_phi_cached.cache_clear()
+        pattern_manager.clear_all_caches()
 
     @staticmethod
     def get_cache_info():
         """Get information about cache usage for monitoring and debugging."""
-        return {
+        phi_cache_info = {
             "pattern_compilation": _compile_pattern.cache_info(),
             "phi_detection": _detect_phi_cached.cache_info()
         }
+        
+        # Include pattern manager cache info
+        pattern_manager_cache = pattern_manager.get_cache_info()
+        phi_cache_info.update({
+            "pattern_manager": pattern_manager_cache
+        })
+        
+        return phi_cache_info
     
     def add_custom_pattern(self, name: str, pattern: str, description: str = "", 
                           confidence_threshold: float = 0.95, category: str = "custom") -> None:
@@ -278,11 +287,18 @@ class PHIRedactor:
     
     def _refresh_patterns(self) -> None:
         """Refresh the internal pattern cache after configuration changes."""
+        # Use cached compiled patterns from pattern manager
+        compiled_patterns = pattern_manager.get_compiled_patterns()
         pattern_configs = pattern_manager.get_all_patterns()
         raw_patterns = {name: config.pattern for name, config in pattern_configs.items()}
         
-        # Update compiled patterns
-        self.patterns = {name: _compile_pattern(expr) for name, expr in raw_patterns.items()}
+        # Update compiled patterns using cached versions when available
+        self.patterns = {}
+        for name, expr in raw_patterns.items():
+            if name in compiled_patterns and compiled_patterns[name] is not None:
+                self.patterns[name] = compiled_patterns[name]
+            else:
+                self.patterns[name] = _compile_pattern(expr)
         
         # Update cache keys
         self._patterns_tuple = tuple(sorted(raw_patterns.items()))
