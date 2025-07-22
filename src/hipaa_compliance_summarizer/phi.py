@@ -4,9 +4,13 @@ from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+import logging
 
 from .config import CONFIG
+from .phi_patterns import pattern_manager, PHIPatternConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -74,23 +78,46 @@ def _detect_phi_cached(text: str, patterns_hash: str, patterns_tuple: Tuple[Tupl
 
 
 class PHIRedactor:
-    """Simple PHI detection and redaction utility."""
+    """Advanced PHI detection and redaction utility with modular pattern support."""
 
-    def __init__(self, mask: str = "[REDACTED]", patterns: Dict[str, str] | None = None) -> None:
+    def __init__(self, mask: str = "[REDACTED]", patterns: Dict[str, str] | None = None, 
+                 pattern_config: Optional[PHIPatternConfig] = None) -> None:
+        """
+        Initialize PHI redactor with flexible pattern configuration.
+        
+        Args:
+            mask: String to replace detected PHI with
+            patterns: Legacy dict of pattern name -> regex string (for backward compatibility)
+            pattern_config: Optional custom pattern configuration
+        """
         self.mask = mask
-        raw_patterns = patterns or CONFIG.get("patterns", {})
-        if not raw_patterns:
-            raw_patterns = {
-                "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
-                "phone": r"\b\d{3}[.-]\d{3}[.-]\d{4}\b",
-                "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
-                "date": r"\b\d{2}/\d{2}/\d{4}\b",
-            }
+        
+        # Initialize pattern manager if not already done
+        if not pattern_manager._default_patterns_loaded:
+            pattern_manager.load_default_patterns()
+        
+        # Load patterns from config if available
+        config_patterns = CONFIG.get("patterns", {})
+        if config_patterns:
+            pattern_manager.load_patterns_from_config(CONFIG)
+        
+        # Handle legacy patterns parameter for backward compatibility
+        if patterns:
+            logger.info("Using legacy patterns parameter - consider migrating to modular pattern system")
+            raw_patterns = patterns
+        else:
+            # Use patterns from the modular system
+            pattern_configs = pattern_manager.get_all_patterns()
+            raw_patterns = {name: config.pattern for name, config in pattern_configs.items()}
+        
+        # Compile patterns for performance
         self.patterns = {name: _compile_pattern(expr) for name, expr in raw_patterns.items()}
         
         # Create hashable representation for caching
         self._patterns_tuple = tuple(sorted(raw_patterns.items()))
         self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode()).hexdigest()
+        
+        logger.info(f"Initialized PHI redactor with {len(self.patterns)} patterns")
 
     def detect(self, text: str) -> List[Entity]:
         """Detect PHI entities in ``text``."""
@@ -141,3 +168,95 @@ class PHIRedactor:
             "pattern_compilation": _compile_pattern.cache_info(),
             "phi_detection": _detect_phi_cached.cache_info()
         }
+    
+    def add_custom_pattern(self, name: str, pattern: str, description: str = "", 
+                          confidence_threshold: float = 0.95, category: str = "custom") -> None:
+        """Add a custom PHI pattern to the redactor.
+        
+        Args:
+            name: Unique name for the pattern
+            pattern: Regular expression pattern
+            description: Human-readable description
+            confidence_threshold: Confidence threshold (0.0 to 1.0)
+            category: Pattern category for organization
+        """
+        phi_pattern = PHIPatternConfig(
+            name=name,
+            pattern=pattern,
+            description=description,
+            confidence_threshold=confidence_threshold,
+            category=category
+        )
+        
+        pattern_manager.add_custom_pattern(phi_pattern, category)
+        
+        # Update this redactor's patterns
+        self._refresh_patterns()
+        logger.info(f"Added custom pattern '{name}' and refreshed redactor")
+    
+    def disable_pattern(self, pattern_name: str) -> bool:
+        """Disable a specific pattern by name.
+        
+        Args:
+            pattern_name: Name of the pattern to disable
+            
+        Returns:
+            True if pattern was found and disabled, False otherwise
+        """
+        result = pattern_manager.disable_pattern(pattern_name)
+        if result:
+            self._refresh_patterns()
+        return result
+    
+    def enable_pattern(self, pattern_name: str) -> bool:
+        """Enable a specific pattern by name.
+        
+        Args:
+            pattern_name: Name of the pattern to enable
+            
+        Returns:
+            True if pattern was found and enabled, False otherwise
+        """
+        result = pattern_manager.enable_pattern(pattern_name)
+        if result:
+            self._refresh_patterns()
+        return result
+    
+    def list_patterns(self) -> Dict[str, Dict[str, str]]:
+        """List all available patterns with their details.
+        
+        Returns:
+            Dictionary mapping pattern names to their configuration details
+        """
+        patterns = pattern_manager.get_all_patterns()
+        return {
+            name: {
+                "pattern": config.pattern,
+                "description": config.description,
+                "category": config.category,
+                "confidence_threshold": config.confidence_threshold,
+                "enabled": config.enabled
+            }
+            for name, config in patterns.items()
+        }
+    
+    def get_pattern_statistics(self) -> Dict[str, int]:
+        """Get statistics about the current pattern configuration."""
+        return pattern_manager.get_pattern_statistics()
+    
+    def _refresh_patterns(self) -> None:
+        """Refresh the internal pattern cache after configuration changes."""
+        pattern_configs = pattern_manager.get_all_patterns()
+        raw_patterns = {name: config.pattern for name, config in pattern_configs.items()}
+        
+        # Update compiled patterns
+        self.patterns = {name: _compile_pattern(expr) for name, expr in raw_patterns.items()}
+        
+        # Update cache keys
+        self._patterns_tuple = tuple(sorted(raw_patterns.items()))
+        self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode()).hexdigest()
+        
+        # Clear relevant caches since patterns changed
+        _detect_phi_cached.cache_clear()
+        
+        logger.debug(f"Refreshed patterns - now using {len(self.patterns)} patterns")
