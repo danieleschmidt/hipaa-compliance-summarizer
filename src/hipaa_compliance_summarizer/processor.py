@@ -71,9 +71,9 @@ class HIPAAProcessor:
                     except SecurityError as e:
                         logger.error("Security validation failed for file %s: %s", path, e)
                         raise SecurityError(f"File security validation failed: {e}")
-            except OSError:
+            except OSError as e:
                 # If path checking fails (e.g., filename too long), treat as text
-                pass
+                logger.debug("Path validation failed for %s: %s. Treating as text content.", path_or_text, e)
         
         return path_or_text
 

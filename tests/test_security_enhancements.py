@@ -72,8 +72,9 @@ class TestSecurityValidation:
         test_file = tmp_path / "large.txt"
         
         # Mock a large file size
+        from hipaa_compliance_summarizer.constants import SECURITY_LIMITS
         with patch.object(Path, 'stat') as mock_stat:
-            mock_stat.return_value.st_size = 200 * 1024 * 1024  # 200MB
+            mock_stat.return_value.st_size = SECURITY_LIMITS.MAX_FILE_SIZE_LARGE
             
             with pytest.raises(SecurityError, match="File too large"):
                 validate_file_size(test_file)

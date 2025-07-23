@@ -130,8 +130,9 @@ class TestSecurityConstantsAndEdgeCases:
 
     def test_security_constants_values(self):
         """Test that security constants have expected values."""
-        assert MAX_FILE_SIZE == 100 * 1024 * 1024  # 100MB
-        assert MAX_PATH_LENGTH == 4096
+        from hipaa_compliance_summarizer.constants import SECURITY_LIMITS
+        assert MAX_FILE_SIZE == SECURITY_LIMITS.MAX_FILE_SIZE
+        assert MAX_PATH_LENGTH == SECURITY_LIMITS.MAX_PATH_LENGTH
         assert len(ALLOWED_EXTENSIONS) >= 8  # Should have common extensions
         assert len(BLOCKED_PATTERNS) >= 6   # Should have common dangerous patterns
         

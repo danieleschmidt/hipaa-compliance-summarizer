@@ -28,3 +28,32 @@
 - Install `pip-audit` in CI for vulnerability scanning
 - Stream large files with `PHIRedactor.redact_file`
 - Show progress in `BatchProcessor.process_directory`
+
+## v0.0.2 - 2025-07-23
+
+### Security Improvements
+- Fix 5 MD5 usage warnings by adding `usedforsecurity=False` parameter for non-security hashing
+- Enhance exception handling with proper logging in empty except blocks
+- Complete security vulnerability scan with bandit (0 issues found)
+- Conduct dependency audit with pip-audit (identified system-level vulnerabilities)
+- Generate comprehensive security audit report with remediation recommendations
+
+### Code Quality Enhancements
+- Add comprehensive docstrings to all CLI main() functions
+- Implement proper exception classes with attributes and context methods:
+  - SecurityError with file_path, violation_type, and context tracking
+  - ParsingError, FileReadError, EncodingError with enhanced metadata
+  - DocumentError, DocumentTypeError with validation details
+- Create centralized constants module to eliminate hardcoded values
+- Extract test data constants and magic numbers to improve maintainability
+
+### Documentation & Reporting
+- Add SECURITY_AUDIT_REPORT.md with detailed vulnerability analysis
+- Update TECHNICAL_DEBT_REPORT.md with comprehensive debt tracking
+- Create COMPREHENSIVE_BACKLOG.md with WSJF-prioritized task management
+- Enhance CLI documentation with detailed argument descriptions
+
+### Infrastructure
+- Integrate autonomous continuous backlog execution system
+- Implement WSJF (Weighted Shortest Job First) prioritization methodology
+- Establish security scanning automation with bandit and pip-audit

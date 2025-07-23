@@ -34,17 +34,18 @@ class TestProcessingMetrics:
     
     def test_processing_metrics_creation(self):
         """Test creating processing metrics."""
+        from hipaa_compliance_summarizer.constants import TEST_CONSTANTS
         metrics = ProcessingMetrics(
-            total_documents=100,
+            total_documents=TEST_CONSTANTS.TEST_DOCS_PROCESSED,
             successful_documents=95,
             failed_documents=5,
             avg_processing_time=2.5,
-            total_processing_time=250.0,
+            total_processing_time=TEST_CONSTANTS.TEST_PROCESSING_TIME,
             avg_compliance_score=0.92,
-            total_phi_detected=1500
+            total_phi_detected=TEST_CONSTANTS.TEST_PHI_DETECTED
         )
         
-        assert metrics.total_documents == 100
+        assert metrics.total_documents == TEST_CONSTANTS.TEST_DOCS_PROCESSED
         assert metrics.successful_documents == 95
         assert metrics.failed_documents == 5
         assert metrics.avg_processing_time == 2.5

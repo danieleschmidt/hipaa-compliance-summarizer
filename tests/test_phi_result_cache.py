@@ -36,9 +36,10 @@ def test_phi_result_caching():
 
 def test_phi_result_cache_with_different_text():
     """Test that cache properly handles different text inputs."""
+    from hipaa_compliance_summarizer.constants import TEST_CONSTANTS
     
-    text1 = "Patient SSN: 123-45-6789"
-    text2 = "Patient SSN: 987-65-4321"
+    text1 = f"Patient SSN: {TEST_CONSTANTS.TEST_SSN_PATTERN}"
+    text2 = f"Patient SSN: {TEST_CONSTANTS.TEST_SSN_PATTERN_ALT}"
     
     redactor = PHIRedactor()
     
@@ -49,8 +50,8 @@ def test_phi_result_cache_with_different_text():
     assert len(result1) == 1
     assert len(result2) == 1
     assert result1[0].value != result2[0].value
-    assert result1[0].value == "123-45-6789"
-    assert result2[0].value == "987-65-4321"
+    assert result1[0].value == TEST_CONSTANTS.TEST_SSN_PATTERN
+    assert result2[0].value == TEST_CONSTANTS.TEST_SSN_PATTERN_ALT
 
 
 def test_phi_result_cache_size_limit():

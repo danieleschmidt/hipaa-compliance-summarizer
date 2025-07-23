@@ -8,18 +8,50 @@ logger = logging.getLogger(__name__)
 
 
 class ParsingError(Exception):
-    """Base exception for parsing-related errors."""
-    pass
+    """Base exception for parsing-related errors.
+    
+    Attributes:
+        file_path: Optional file path that failed to parse
+        parser_type: Type of parser that encountered the error
+        original_error: Original exception that triggered this parsing error
+    """
+    
+    def __init__(self, message: str, file_path: Optional[str] = None,
+                 parser_type: Optional[str] = None, original_error: Optional[Exception] = None):
+        super().__init__(message)
+        self.file_path = file_path
+        self.parser_type = parser_type
+        self.original_error = original_error
 
 
 class FileReadError(ParsingError):
-    """Raised when file cannot be read due to various issues."""
-    pass
+    """Raised when file cannot be read due to various issues.
+    
+    Attributes:
+        permission_error: True if this was caused by permission issues
+        file_size: Size of file if available
+    """
+    
+    def __init__(self, message: str, file_path: Optional[str] = None,
+                 permission_error: bool = False, file_size: Optional[int] = None, **kwargs):
+        super().__init__(message, file_path=file_path, **kwargs)
+        self.permission_error = permission_error
+        self.file_size = file_size
 
 
 class EncodingError(ParsingError):
-    """Raised when file encoding issues prevent proper text extraction."""
-    pass
+    """Raised when file encoding issues prevent proper text extraction.
+    
+    Attributes:
+        attempted_encodings: List of encodings that were tried
+        detected_encoding: Encoding that was detected (if any)
+    """
+    
+    def __init__(self, message: str, attempted_encodings: Optional[list] = None,
+                 detected_encoding: Optional[str] = None, **kwargs):
+        super().__init__(message, **kwargs)
+        self.attempted_encodings = attempted_encodings or []
+        self.detected_encoding = detected_encoding
 
 
 def _load_text(path_or_text: str, encoding: str = 'utf-8', fallback_encodings: Optional[list] = None) -> str:
