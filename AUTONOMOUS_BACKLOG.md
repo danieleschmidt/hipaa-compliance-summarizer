@@ -36,7 +36,7 @@
 | ID | Task | Business Value | Time Criticality | Risk Reduction | Effort (Story Points) | WSJF Score | Status |
 |----|------|----------------|------------------|----------------|---------------------|------------|---------|
 | D001 | Update CLI documentation | 10 | 5 | 5 | 2 | 10 | Completed |
-| D002 | Add integration tests for full pipeline | 15 | 10 | 15 | 8 | 5 | Ready |
+| D002 | Add integration tests for full pipeline | 15 | 10 | 15 | 8 | 5 | Completed |
 | D003 | Package preparation for PyPI release | 20 | 5 | 5 | 5 | 6 | Ready |
 
 ## Current Work in Progress
@@ -45,7 +45,7 @@
 - **Priority**: Low (WSJF: 6) 
 - **Estimated Effort**: 5 story points
 - **Risk Level**: Low
-- **Dependencies**: D001 (Completed)
+- **Dependencies**: D001 (Completed), D002 (Completed)
 - **Note**: Prepare package metadata, build configuration, and release documentation for PyPI publication
 
 ## Completed Tasks (Last 7 Days)
@@ -62,6 +62,7 @@
 | C002 | Add performance monitoring dashboard | 2025-07-22 | High |
 | C003 | Implement caching for PHI patterns | 2025-07-22 | High |
 | D001 | Update CLI documentation | 2025-07-22 | Medium |
+| D002 | Add integration tests for full pipeline | 2025-07-23 | High |
 | - | Comprehensive security validation implementation | 2025-07-20 | High |
 | - | Batch processing performance optimizations | 2025-07-20 | Medium |
 | - | Test failures resolution | 2025-07-20 | High |
