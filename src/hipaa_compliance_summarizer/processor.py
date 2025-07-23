@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Optional, Union
 
+from .constants import SECURITY_LIMITS
 from .documents import Document, DocumentType, DocumentError, validate_document
 from .parsers import (
     parse_clinical_note,
@@ -67,13 +68,26 @@ class HIPAAProcessor:
                     try:
                         # Apply security validation for file paths
                         validated_path = validate_file_for_processing(str(path))
-                        return validated_path.read_text()
+                        try:
+                            return validated_path.read_text(encoding='utf-8', errors='strict')
+                        except UnicodeDecodeError as e:
+                            logger.error("File encoding error for %s: %s", path, e)
+                            raise ValueError(f"File contains invalid UTF-8 encoding: {e}")
+                        except IOError as e:
+                            logger.error("File read error for %s: %s", path, e)
+                            raise IOError(f"Cannot read file: {e}")
                     except SecurityError as e:
                         logger.error("Security validation failed for file %s: %s", path, e)
                         raise SecurityError(f"File security validation failed: {e}")
+                else:
+                    # File doesn't exist, treat as text content
+                    logger.debug("Path %s does not exist. Treating as text content.", path_or_text)
             except OSError as e:
-                # If path checking fails (e.g., filename too long), treat as text
+                # If path checking fails (e.g., filename too long, permission denied), treat as text
                 logger.debug("Path validation failed for %s: %s. Treating as text content.", path_or_text, e)
+            except PermissionError as e:
+                # Permission denied accessing file system
+                logger.warning("Permission denied for path %s: %s. Treating as text content.", path_or_text, e)
         
         return path_or_text
 
@@ -100,7 +114,7 @@ class HIPAAProcessor:
             raise ValueError("Input must be a string")
         
         # Check for excessive length to prevent DoS
-        max_length = 50 * 1024 * 1024  # 50MB text limit
+        max_length = SECURITY_LIMITS.MAX_DOCUMENT_SIZE
         if len(text) > max_length:
             raise ValueError(f"Text too large: {len(text)} characters (max {max_length})")
         
