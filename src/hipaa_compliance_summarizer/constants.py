@@ -72,6 +72,49 @@ class PerformanceLimits:
 
 
 @dataclass
+class ProcessingConstants:
+    """Constants for document processing and summarization."""
+    
+    # Text summarization widths
+    SUMMARY_WIDTH_STRICT: int = 400      # Characters for strict compliance
+    SUMMARY_WIDTH_STANDARD: int = 600    # Characters for standard compliance
+    
+    # Scoring constants
+    SCORING_PENALTY_PER_ENTITY: float = 0.01   # Penalty per PHI entity found
+    SCORING_PENALTY_CAP: float = 0.2           # Maximum penalty cap
+    SCORING_STRICT_MULTIPLIER: float = 1.5     # Multiplier for strict compliance
+    
+    # Cache and file handling
+    DEFAULT_CACHE_SIZE: int = 50               # Maximum files in cache
+    SMALL_FILE_THRESHOLD: int = 512 * 1024    # 512KB threshold for small files
+    LARGE_FILE_THRESHOLD: int = 1024 * 1024   # 1MB threshold for memory mapping
+    
+    # Processing intervals
+    PROGRESS_REPORT_INTERVAL: int = 10         # Report progress every N files
+    DEFAULT_WORKERS: int = 4                   # Default max workers
+    
+    # Control character thresholds
+    CONTROL_CHAR_THRESHOLD: int = 32           # ASCII threshold for control chars
+    
+    @classmethod
+    def from_environment(cls) -> 'ProcessingConstants':
+        """Create ProcessingConstants from environment variables."""
+        return cls(
+            SUMMARY_WIDTH_STRICT=int(os.environ.get('HIPAA_SUMMARY_WIDTH_STRICT', cls.SUMMARY_WIDTH_STRICT)),
+            SUMMARY_WIDTH_STANDARD=int(os.environ.get('HIPAA_SUMMARY_WIDTH_STANDARD', cls.SUMMARY_WIDTH_STANDARD)),
+            SCORING_PENALTY_PER_ENTITY=float(os.environ.get('HIPAA_SCORING_PENALTY_PER_ENTITY', cls.SCORING_PENALTY_PER_ENTITY)),
+            SCORING_PENALTY_CAP=float(os.environ.get('HIPAA_SCORING_PENALTY_CAP', cls.SCORING_PENALTY_CAP)),
+            SCORING_STRICT_MULTIPLIER=float(os.environ.get('HIPAA_SCORING_STRICT_MULTIPLIER', cls.SCORING_STRICT_MULTIPLIER)),
+            DEFAULT_CACHE_SIZE=int(os.environ.get('HIPAA_DEFAULT_CACHE_SIZE', cls.DEFAULT_CACHE_SIZE)),
+            SMALL_FILE_THRESHOLD=int(os.environ.get('HIPAA_SMALL_FILE_THRESHOLD', cls.SMALL_FILE_THRESHOLD)),
+            LARGE_FILE_THRESHOLD=int(os.environ.get('HIPAA_LARGE_FILE_THRESHOLD', cls.LARGE_FILE_THRESHOLD)),
+            PROGRESS_REPORT_INTERVAL=int(os.environ.get('HIPAA_PROGRESS_REPORT_INTERVAL', cls.PROGRESS_REPORT_INTERVAL)),
+            DEFAULT_WORKERS=int(os.environ.get('HIPAA_DEFAULT_WORKERS', cls.DEFAULT_WORKERS)),
+            CONTROL_CHAR_THRESHOLD=int(os.environ.get('HIPAA_CONTROL_CHAR_THRESHOLD', cls.CONTROL_CHAR_THRESHOLD)),
+        )
+
+
+@dataclass
 class TestConstants:
     """Constants used in testing."""
     
@@ -102,6 +145,7 @@ class TestConstants:
 # Global instances
 SECURITY_LIMITS = SecurityLimits.from_environment()
 PERFORMANCE_LIMITS = PerformanceLimits.from_environment()
+PROCESSING_CONSTANTS = ProcessingConstants.from_environment()
 TEST_CONSTANTS = TestConstants()
 
 # Legacy constants for backward compatibility

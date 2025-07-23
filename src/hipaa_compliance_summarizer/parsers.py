@@ -22,6 +22,32 @@ class ParsingError(Exception):
         self.file_path = file_path
         self.parser_type = parser_type
         self.original_error = original_error
+    
+    def get_context(self) -> dict:
+        """Get error context information for logging and debugging."""
+        context = {
+            "error_type": self.__class__.__name__,
+            "message": str(self),
+            "file_path": self.file_path,
+            "parser_type": self.parser_type,
+        }
+        if self.original_error:
+            context["original_error"] = {
+                "type": self.original_error.__class__.__name__,
+                "message": str(self.original_error)
+            }
+        return context
+    
+    def to_dict(self) -> dict:
+        """Convert error to dictionary for serialization."""
+        return self.get_context()
+    
+    def get_user_message(self) -> str:
+        """Get user-friendly error message without technical details."""
+        base_message = str(self)
+        if self.file_path:
+            return f"Error parsing file {self.file_path}: {base_message}"
+        return f"Parsing error: {base_message}"
 
 
 class FileReadError(ParsingError):

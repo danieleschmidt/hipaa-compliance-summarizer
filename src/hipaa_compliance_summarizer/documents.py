@@ -24,6 +24,32 @@ class DocumentError(Exception):
         self.document_type = document_type
         self.validation_errors = validation_errors or []
         self.original_error = original_error
+    
+    def get_context(self) -> dict:
+        """Get error context information for logging and debugging."""
+        context = {
+            "error_type": self.__class__.__name__,
+            "message": str(self),
+            "document_type": self.document_type,
+            "validation_errors": self.validation_errors,
+        }
+        if self.original_error:
+            context["original_error"] = {
+                "type": self.original_error.__class__.__name__,
+                "message": str(self.original_error)
+            }
+        return context
+    
+    def to_dict(self) -> dict:
+        """Convert error to dictionary for serialization."""
+        return self.get_context()
+    
+    def get_user_message(self) -> str:
+        """Get user-friendly error message without technical details."""
+        base_message = str(self)
+        if self.document_type:
+            return f"Error processing {self.document_type} document: {base_message}"
+        return f"Document processing error: {base_message}"
 
 
 class DocumentTypeError(DocumentError):

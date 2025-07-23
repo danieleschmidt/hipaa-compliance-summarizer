@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Optional, Union
 
-from .constants import SECURITY_LIMITS
+from .constants import SECURITY_LIMITS, PROCESSING_CONSTANTS
 from .documents import Document, DocumentType, DocumentError, validate_document
 from .parsers import (
     parse_clinical_note,
@@ -52,8 +53,37 @@ class HIPAAProcessor:
         *,
         redactor: Optional[PHIRedactor] = None,
     ) -> None:
-        self.compliance_level = ComplianceLevel(compliance_level)
+        self.compliance_level = self._validate_compliance_level(compliance_level)
         self.redactor = redactor or PHIRedactor()
+    
+    def _validate_compliance_level(self, level) -> ComplianceLevel:
+        """Validate compliance level with comprehensive checking."""
+        if level is None:
+            raise ValueError("Compliance level cannot be None")
+        
+        # Handle string inputs
+        if isinstance(level, str):
+            level_map = {
+                'strict': ComplianceLevel.STRICT,
+                'standard': ComplianceLevel.STANDARD, 
+                'minimal': ComplianceLevel.MINIMAL
+            }
+            if level.lower() not in level_map:
+                raise ValueError(f"Invalid compliance level string: {level}. Must be one of: {list(level_map.keys())}")
+            return level_map[level.lower()]
+        
+        # Handle enum inputs
+        if isinstance(level, ComplianceLevel):
+            return level
+        
+        # Try to convert from int
+        if isinstance(level, int):
+            try:
+                return ComplianceLevel(level)
+            except ValueError:
+                raise ValueError(f"Invalid compliance level integer: {level}. Must be 0 (STRICT), 1 (STANDARD), or 2 (MINIMAL)")
+        
+        raise ValueError(f"Compliance level must be a ComplianceLevel enum, string, or int, got {type(level).__name__}")
 
     def _load_text(self, path_or_text: str) -> str:
         # Only treat as path if it looks like one and is reasonable length
@@ -93,7 +123,9 @@ class HIPAAProcessor:
 
     def _summarize(self, text: str) -> str:
         """Naive summarization by shortening the text."""
-        width = 400 if self.compliance_level == ComplianceLevel.STRICT else 600
+        width = (PROCESSING_CONSTANTS.SUMMARY_WIDTH_STRICT 
+                if self.compliance_level == ComplianceLevel.STRICT 
+                else PROCESSING_CONSTANTS.SUMMARY_WIDTH_STANDARD)
         return textwrap.shorten(text, width=width, placeholder="...")
 
     def _score(self, redacted: RedactionResult) -> float:
@@ -109,9 +141,19 @@ class HIPAAProcessor:
         return max(0.0, base - penalty)
 
     def _validate_input_text(self, text: str) -> str:
-        """Validate and sanitize input text for security."""
+        """Validate and sanitize input text for comprehensive security and data integrity."""
+        # Handle null input
+        if text is None:
+            raise ValueError("Input text cannot be None")
+        
+        # Type validation
         if not isinstance(text, str):
-            raise ValueError("Input must be a string")
+            raise ValueError(f"Input must be a string, got {type(text).__name__}")
+        
+        # Handle empty strings
+        if len(text.strip()) == 0:
+            logger.warning("Empty or whitespace-only input received")
+            return ""  # Allow empty strings but normalize them
         
         # Check for excessive length to prevent DoS
         max_length = SECURITY_LIMITS.MAX_DOCUMENT_SIZE
@@ -122,11 +164,33 @@ class HIPAAProcessor:
         if '\x00' in text:
             raise ValueError("Text contains null bytes - possibly binary content")
         
-        # Log suspicious patterns but don't reject (medical text might contain these)
-        suspicious_patterns = ['<script', 'javascript:', 'data:text/html']
+        # Unicode validation and normalization
+        try:
+            # Normalize Unicode to handle different encodings consistently
+            import unicodedata
+            text = unicodedata.normalize('NFKC', text)
+        except UnicodeError as e:
+            raise ValueError(f"Invalid Unicode content: {e}")
+        
+        # Control character filtering (but preserve common whitespace)
+        control_chars = [char for char in text if ord(char) < PROCESSING_CONSTANTS.CONTROL_CHAR_THRESHOLD and char not in '\t\n\r']
+        if control_chars:
+            logger.warning("Removing %d control characters from input", len(control_chars))
+            text = ''.join(char for char in text if ord(char) >= PROCESSING_CONSTANTS.CONTROL_CHAR_THRESHOLD or char in '\t\n\r')
+        
+        # Enhanced injection attack prevention
+        suspicious_patterns = [
+            r'<script[^>]*>',  # Script injection
+            r'javascript:',     # JavaScript protocol
+            r'data:.*base64',   # Data URL attacks
+            r'eval\s*\(',       # JavaScript eval
+            r'exec\s*\(',       # Python exec
+        ]
+        
         for pattern in suspicious_patterns:
-            if pattern.lower() in text.lower():
-                logger.warning("Suspicious pattern detected in text: %s", pattern)
+            if re.search(pattern, text, re.IGNORECASE):
+                logger.warning("Potentially malicious pattern detected and sanitized: %s", pattern)
+                text = re.sub(pattern, '[SANITIZED]', text, flags=re.IGNORECASE)
         
         return text
 
