@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Optional, List
 import logging
 
+from .constants import SECURITY_LIMITS
+
 logger = logging.getLogger(__name__)
 
-# Security constants
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-MAX_PATH_LENGTH = 4096
+# Security constants (imported from centralized config)
+MAX_FILE_SIZE = SECURITY_LIMITS.MAX_FILE_SIZE
+MAX_PATH_LENGTH = SECURITY_LIMITS.MAX_PATH_LENGTH
 ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.doc', '.docx', '.html', '.xml', '.json', '.csv'}
 BLOCKED_PATTERNS = [
     r'\.\./',  # Path traversal

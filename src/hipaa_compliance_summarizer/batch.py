@@ -157,29 +157,56 @@ class BatchProcessor:
         Returns:
             List of processing results or error results
         """
-        # Auto-detect optimal worker count if not specified
+        # Validate parameters and setup
+        max_workers = self._validate_and_setup_workers(max_workers)
+        self._validate_compliance_level(compliance_level)
+        
+        # Validate input directory
+        in_path = self._validate_input_directory(input_dir)
+        
+        # Setup output directory
+        out_path = self._setup_output_directory(output_dir)
+        
+        # Collect files to process
+        files = self._collect_files_to_process(in_path)
+        if not files:
+            logger.warning("No files found in input directory: %s", input_dir)
+            return []
+        
+        # Optimize processing order and workers
+        files, max_workers = self._optimize_processing_setup(files, max_workers)
+        
+        logger.info("Processing %d files with %d workers", len(files), max_workers)
+        
+        # Process files and return results
+        return self._execute_file_processing(
+            files, out_path, generate_summaries, show_progress, max_workers
+        )
+    
+    def _validate_and_setup_workers(self, max_workers: Optional[int]) -> int:
+        """Validate and setup optimal worker count."""
         if max_workers is None:
             max_workers = min(4, max(1, multiprocessing.cpu_count() - 1))
             logger.info("Auto-detected optimal workers: %d", max_workers)
         
-        # Validate input parameters
         if max_workers <= 0:
             raise ValueError("max_workers must be positive")
         
+        return max_workers
+    
+    def _validate_compliance_level(self, compliance_level: Optional[str]) -> None:
+        """Validate and set compliance level."""
         if compliance_level is not None:
             try:
-                # Validate compliance level
                 self.processor.compliance_level = ComplianceLevel(compliance_level)
             except ValueError as e:
                 raise ValueError(f"Invalid compliance level: {e}")
-
-        results: List[Union[ProcessingResult, ErrorResult]] = []
-        
-        # Validate input directory with security checks
+    
+    def _validate_input_directory(self, input_dir: str) -> Path:
+        """Validate input directory with security checks."""
         try:
-            in_path = validate_directory_path(input_dir)
+            return validate_directory_path(input_dir)
         except SecurityError as e:
-            # Convert SecurityError to appropriate exception type for backward compatibility
             error_msg = str(e)
             if "does not exist" in error_msg:
                 raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
@@ -191,193 +218,78 @@ class BatchProcessor:
                 raise ValueError(f"Security validation failed for input directory: {e}")
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Permission denied accessing input directory: {e}")
-        
-        # Setup output directory if specified with security validation
-        out_path = None
-        if output_dir:
-            try:
-                # Validate the parent directory path for security
-                output_parent = str(Path(output_dir).parent)
-                if output_parent != '.':
-                    validate_directory_path(output_parent)
-                
-                out_path = Path(output_dir)
-                out_path.mkdir(parents=True, exist_ok=True)
-                
-                # Validate the created directory
-                validate_directory_path(str(out_path))
-                
-            except SecurityError as e:
-                # Only reject truly dangerous paths, allow reasonable directories to be created
-                if "dangerous path pattern" in str(e):
-                    raise ValueError(f"Security validation failed for output directory: {e}")
-                # For other security errors, try to proceed but log a warning
-                logger.warning("Output directory security check: %s", e)
-            except (OSError, PermissionError) as e:
-                raise PermissionError(f"Cannot create output directory: {e}")
-
-        # Get list of files to process
+    
+    def _setup_output_directory(self, output_dir: Optional[str]) -> Optional[Path]:
+        """Setup output directory with security validation."""
+        if not output_dir:
+            return None
+            
         try:
-            files = [f for f in in_path.iterdir() if f.is_file()]
+            # Validate the parent directory path for security
+            output_parent = str(Path(output_dir).parent)
+            if output_parent != '.':
+                validate_directory_path(output_parent)
+            
+            out_path = Path(output_dir)
+            out_path.mkdir(parents=True, exist_ok=True)
+            
+            # Validate the created directory
+            validate_directory_path(str(out_path))
+            return out_path
+            
+        except SecurityError as e:
+            # Only reject truly dangerous paths, allow reasonable directories to be created
+            if "dangerous path pattern" in str(e):
+                raise ValueError(f"Security validation failed for output directory: {e}")
+            # For other security errors, try to proceed but log a warning
+            logger.warning("Output directory security check: %s", e)
+            return Path(output_dir)
+        except (OSError, PermissionError) as e:
+            raise PermissionError(f"Cannot create output directory: {e}")
+    
+    def _collect_files_to_process(self, in_path: Path) -> List[Path]:
+        """Collect list of files to process from input directory."""
+        try:
+            return [f for f in in_path.iterdir() if f.is_file()]
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Permission denied accessing input directory: {e}")
-        
-        total = len(files)
-        if total == 0:
-            logger.warning("No files found in input directory: %s", input_dir)
-            return results
-
+    
+    def _optimize_processing_setup(self, files: List[Path], max_workers: int) -> tuple[List[Path], int]:
+        """Optimize file processing order and worker count."""
         # Sort files by size for better processing order (small files first)
         files.sort(key=lambda f: f.stat().st_size)
         
         # Preload small files into cache for faster access
         self._preload_files(files)
-
+        
         # Adaptive worker scaling based on file count
+        total = len(files)
         if total < max_workers:
             max_workers = max(1, total)
             logger.info("Reducing workers to %d for %d files", max_workers, total)
         
-        logger.info("Processing %d files with %d workers", total, max_workers)
-
-        def handle(file: Path) -> Union[ProcessingResult, ErrorResult]:
-            """Process a single file with comprehensive error handling."""
-            document_id = str(file)
-            
-            # Start performance monitoring
-            if self.performance_monitor:
-                self.performance_monitor.start_document_processing(document_id)
-            
-            try:
-                logger.info("Processing file %s", file)
-                
-                # Security validation first
-                try:
-                    validated_file = validate_file_for_processing(str(file))
-                except SecurityError as e:
-                    error_result = ErrorResult(
-                        file_path=str(file),
-                        error=f"Security validation failed: {e}",
-                        error_type="SecurityError"
-                    )
-                    if self.performance_monitor:
-                        self.performance_monitor.end_document_processing(
-                            document_id, success=False, error=error_result.error
-                        )
-                    return error_result
-                
-                # Detect document type
-                try:
-                    doc_type = detect_document_type(validated_file.name)
-                except Exception as e:
-                    error_result = ErrorResult(
-                        file_path=str(file),
-                        error=f"Failed to detect document type: {e}",
-                        error_type="DocumentTypeError"
-                    )
-                    if self.performance_monitor:
-                        self.performance_monitor.end_document_processing(
-                            document_id, success=False, error=error_result.error
-                        )
-                    return error_result
-                
-                # Create document object and process
-                try:
-                    # Always create a Document object for consistency
-                    doc = Document(str(validated_file), doc_type)
-                    result = self.processor.process_document(doc)
-                except (IOError, OSError) as e:
-                    error_result = ErrorResult(
-                        file_path=str(file),
-                        error=f"File read error: {e}",
-                        error_type="FileReadError"
-                    )
-                    if self.performance_monitor:
-                        self.performance_monitor.end_document_processing(
-                            document_id, success=False, error=error_result.error
-                        )
-                    return error_result
-                except MemoryError as e:
-                    error_result = ErrorResult(
-                        file_path=str(file),
-                        error=f"Out of memory: {e}",
-                        error_type="MemoryError"
-                    )
-                    if self.performance_monitor:
-                        self.performance_monitor.end_document_processing(
-                            document_id, success=False, error=error_result.error
-                        )
-                    return error_result
-                except Exception as e:
-                    error_result = ErrorResult(
-                        file_path=str(file),
-                        error=f"Processing error: {e}",
-                        error_type="ProcessingError"
-                    )
-                    if self.performance_monitor:
-                        self.performance_monitor.end_document_processing(
-                            document_id, success=False, error=error_result.error
-                        )
-                    return error_result
-                
-                # Write output files if output directory specified
-                if out_path:
-                    try:
-                        # Sanitize filename for security
-                        safe_filename = sanitize_filename(validated_file.name)
-                        out_file = out_path / safe_filename
-                        
-                        # Ensure we don't overwrite existing files
-                        counter = 1
-                        while out_file.exists():
-                            name, ext = os.path.splitext(safe_filename)
-                            out_file = out_path / f"{name}_{counter}{ext}"
-                            counter += 1
-                        
-                        out_file.write_text(result.redacted.text)
-                        
-                        if generate_summaries:
-                            summary_file = out_file.with_suffix(out_file.suffix + ".summary.txt")
-                            summary_file.write_text(result.summary)
-                    except (IOError, OSError, PermissionError) as e:
-                        error_result = ErrorResult(
-                            file_path=str(file),
-                            error=f"Cannot write file: {e}",
-                            error_type="FileWriteError"
-                        )
-                        if self.performance_monitor:
-                            self.performance_monitor.end_document_processing(
-                                document_id, success=False, error=error_result.error
-                            )
-                        return error_result
-                
-                # Successfully processed - record metrics
-                if self.performance_monitor:
-                    self.performance_monitor.end_document_processing(
-                        document_id, success=True, result=result
-                    )
-                
-                return result
-                
-            except Exception as e:
-                # Catch-all for any unexpected errors
-                error_result = ErrorResult(
-                    file_path=str(file),
-                    error=f"Unexpected error: {e}",
-                    error_type="UnexpectedError"
-                )
-                if self.performance_monitor:
-                    self.performance_monitor.end_document_processing(
-                        document_id, success=False, error=error_result.error
-                    )
-                return error_result
-
-        # Process files with thread pool and error handling
+        return files, max_workers
+    
+    def _execute_file_processing(
+        self,
+        files: List[Path],
+        out_path: Optional[Path],
+        generate_summaries: bool,
+        show_progress: bool,
+        max_workers: int
+    ) -> List[Union[ProcessingResult, ErrorResult]]:
+        """Execute file processing with thread pool."""
+        results: List[Union[ProcessingResult, ErrorResult]] = []
+        total = len(files)
         processed = 0
+        
         try:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks and track futures
-                future_to_file = {executor.submit(handle, file): file for file in files}
+                future_to_file = {
+                    executor.submit(self._process_file_with_monitoring, file, out_path, generate_summaries): file 
+                    for file in files
+                }
                 
                 for future in as_completed(future_to_file):
                     file = future_to_file[future]
@@ -405,8 +317,131 @@ class BatchProcessor:
                             
         except Exception as e:
             raise RuntimeError(f"Thread pool execution failed: {e}")
-
+        
         # Log summary
+        self._log_processing_summary(results)
+        return results
+    
+    def _process_file_with_monitoring(
+        self, 
+        file: Path, 
+        out_path: Optional[Path], 
+        generate_summaries: bool
+    ) -> Union[ProcessingResult, ErrorResult]:
+        """Process a single file with comprehensive monitoring and error handling."""
+        document_id = str(file)
+        
+        # Start performance monitoring
+        if self.performance_monitor:
+            self.performance_monitor.start_document_processing(document_id)
+        
+        try:
+            logger.info("Processing file %s", file)
+            
+            # Security validation first
+            try:
+                validated_file = validate_file_for_processing(str(file))
+            except SecurityError as e:
+                return self._create_error_result(
+                    file, f"Security validation failed: {e}", "SecurityError", document_id
+                )
+            
+            # Detect document type
+            try:
+                doc_type = detect_document_type(validated_file.name)
+            except Exception as e:
+                return self._create_error_result(
+                    file, f"Failed to detect document type: {e}", "DocumentTypeError", document_id
+                )
+            
+            # Create document object and process
+            try:
+                doc = Document(str(validated_file), doc_type)
+                result = self.processor.process_document(doc)
+            except (IOError, OSError) as e:
+                return self._create_error_result(
+                    file, f"File read error: {e}", "FileReadError", document_id
+                )
+            except MemoryError as e:
+                return self._create_error_result(
+                    file, f"Out of memory: {e}", "MemoryError", document_id
+                )
+            except Exception as e:
+                return self._create_error_result(
+                    file, f"Processing error: {e}", "ProcessingError", document_id
+                )
+            
+            # Write output files if output directory specified
+            if out_path:
+                try:
+                    self._write_output_files(validated_file, out_path, result, generate_summaries)
+                except (IOError, OSError, PermissionError) as e:
+                    return self._create_error_result(
+                        file, f"Cannot write file: {e}", "FileWriteError", document_id
+                    )
+            
+            # Successfully processed - record metrics
+            if self.performance_monitor:
+                self.performance_monitor.end_document_processing(
+                    document_id, success=True, result=result
+                )
+            
+            return result
+            
+        except Exception as e:
+            # Catch-all for any unexpected errors
+            return self._create_error_result(
+                file, f"Unexpected error: {e}", "UnexpectedError", document_id
+            )
+    
+    def _create_error_result(
+        self, 
+        file: Path, 
+        error_msg: str, 
+        error_type: str, 
+        document_id: str
+    ) -> ErrorResult:
+        """Create an error result and handle performance monitoring."""
+        error_result = ErrorResult(
+            file_path=str(file),
+            error=error_msg,
+            error_type=error_type
+        )
+        
+        if self.performance_monitor:
+            self.performance_monitor.end_document_processing(
+                document_id, success=False, error=error_result.error
+            )
+        
+        return error_result
+    
+    def _write_output_files(
+        self, 
+        validated_file: Path, 
+        out_path: Path, 
+        result: ProcessingResult, 
+        generate_summaries: bool
+    ) -> None:
+        """Write output files to the specified directory."""
+        # Sanitize filename for security
+        safe_filename = sanitize_filename(validated_file.name)
+        out_file = out_path / safe_filename
+        
+        # Ensure we don't overwrite existing files
+        counter = 1
+        while out_file.exists():
+            name, ext = os.path.splitext(safe_filename)
+            out_file = out_path / f"{name}_{counter}{ext}"
+            counter += 1
+        
+        out_file.write_text(result.redacted.text)
+        
+        if generate_summaries:
+            summary_file = out_file.with_suffix(out_file.suffix + ".summary.txt")
+            summary_file.write_text(result.summary)
+    
+    def _log_processing_summary(self, results: List[Union[ProcessingResult, ErrorResult]]) -> None:
+        """Log summary of processing results."""
         successful_count = sum(1 for r in results if isinstance(r, ProcessingResult))
         error_count = len(results) - successful_count
         
@@ -416,7 +451,6 @@ class BatchProcessor:
         else:
             logger.info("Successfully processed %d files", successful_count)
 
-        return results
 
     def generate_dashboard(self, results: Sequence[Union[ProcessingResult, ErrorResult]]) -> BatchDashboard:
         """Create a dashboard summary for ``results``."""
