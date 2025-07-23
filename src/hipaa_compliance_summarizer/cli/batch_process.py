@@ -10,6 +10,26 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    """
+    Entry point for the HIPAA batch processing CLI tool.
+    
+    Processes multiple healthcare documents in batch with PHI redaction,
+    compliance validation, and optional dashboard generation. Supports
+    configurable compliance levels and cache performance monitoring.
+    
+    Environment validation is performed before processing begins.
+    
+    Command-line arguments:
+        --input-dir: Directory containing documents to process
+        --output-dir: Directory for processed documents
+        --compliance-level: Compliance strictness (strict/standard/minimal)
+        --generate-summaries: Generate summary files alongside redacted documents
+        --show-dashboard: Display batch processing summary after completion
+        --dashboard-json: Save dashboard summary to JSON file
+        --show-cache-performance: Display cache performance metrics
+    
+    Exits with status code 1 if environment validation fails.
+    """
     # Setup logging first
     setup_logging_with_config()
     

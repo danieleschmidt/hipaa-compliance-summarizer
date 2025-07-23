@@ -25,8 +25,31 @@ BLOCKED_PATTERNS = [
 
 
 class SecurityError(Exception):
-    """Raised when a security validation fails."""
-    pass
+    """Raised when a security validation fails.
+    
+    Attributes:
+        file_path: Optional file path that caused the security error
+        violation_type: Type of security violation detected
+        original_error: Original exception that triggered this security error
+    """
+    
+    def __init__(self, message: str, file_path: Optional[str] = None, 
+                 violation_type: Optional[str] = None, original_error: Optional[Exception] = None):
+        super().__init__(message)
+        self.file_path = file_path
+        self.violation_type = violation_type
+        self.original_error = original_error
+    
+    def get_context(self) -> dict:
+        """Get contextual information about the security error."""
+        context = {}
+        if self.file_path:
+            context["file_path"] = self.file_path
+        if self.violation_type:
+            context["violation_type"] = self.violation_type
+        if self.original_error:
+            context["original_error"] = str(self.original_error)
+        return context
 
 
 def validate_file_path(file_path: str) -> Path:

@@ -5,6 +5,21 @@ from hipaa_compliance_summarizer import ComplianceReporter
 
 
 def main() -> None:
+    """
+    Entry point for the HIPAA compliance reporting CLI tool.
+    
+    Generates detailed compliance reports for specified audit periods,
+    including metrics on documents processed, PHI detection accuracy,
+    and compliance recommendations.
+    
+    Command-line arguments:
+        --audit-period: Reporting period (e.g., "2024-Q1", "2024-01")
+        --documents-processed: Number of documents processed (default: 0)
+        --include-recommendations: Include compliance recommendations in output
+    
+    Outputs a formatted compliance report to stdout with metrics and
+    recommendations for improving HIPAA compliance posture.
+    """
     parser = ArgumentParser(description="Generate compliance report")
     parser.add_argument("--audit-period", required=True, help="Reporting period")
     parser.add_argument("--documents-processed", type=int, default=0)

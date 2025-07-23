@@ -70,8 +70,9 @@ class TestBatchIOOptimizations:
         processor = BatchProcessor()
         
         # Create a large file (> 1MB)
+        from hipaa_compliance_summarizer.constants import TEST_CONSTANTS
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            large_content = "Large file content. " * 60000  # ~1.2MB
+            large_content = "Large file content. " * TEST_CONSTANTS.LARGE_FILE_SIZE  # ~1.2MB
             f.write(large_content)
             temp_path = Path(f.name)
         

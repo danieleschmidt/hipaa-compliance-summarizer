@@ -4,19 +4,41 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class DocumentError(Exception):
-    """Base exception for document-related errors."""
-    pass
+    """Base exception for document-related errors.
+    
+    Attributes:
+        document_type: Type of document that caused the error
+        validation_errors: List of validation errors if applicable
+        original_error: Original exception that triggered this error
+    """
+    
+    def __init__(self, message: str, document_type: Optional[str] = None,
+                 validation_errors: Optional[list] = None, original_error: Optional[Exception] = None):
+        super().__init__(message)
+        self.document_type = document_type
+        self.validation_errors = validation_errors or []
+        self.original_error = original_error
 
 
 class DocumentTypeError(DocumentError):
-    """Raised when document type detection fails."""
-    pass
+    """Raised when document type detection fails.
+    
+    Attributes:
+        type_candidates: List of possible document types that were considered
+        confidence_scores: Dictionary of type -> confidence mappings if available
+    """
+    
+    def __init__(self, message: str, type_candidates: Optional[list] = None,
+                 confidence_scores: Optional[dict] = None, **kwargs):
+        super().__init__(message, **kwargs)
+        self.type_candidates = type_candidates or []
+        self.confidence_scores = confidence_scores or {}
 
 
 class DocumentType(str, Enum):

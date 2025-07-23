@@ -119,7 +119,7 @@ class PHIRedactor:
         
         # Create hashable representation for caching
         self._patterns_tuple = tuple(sorted(raw_patterns.items()))
-        self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode()).hexdigest()
+        self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode(), usedforsecurity=False).hexdigest()
         
         logger.info(f"Initialized PHI redactor with {len(self.patterns)} patterns")
 
@@ -302,7 +302,7 @@ class PHIRedactor:
         
         # Update cache keys
         self._patterns_tuple = tuple(sorted(raw_patterns.items()))
-        self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode()).hexdigest()
+        self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode(), usedforsecurity=False).hexdigest()
         
         # Clear relevant caches since patterns changed
         _detect_phi_cached.cache_clear()

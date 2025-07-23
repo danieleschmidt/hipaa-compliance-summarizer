@@ -230,7 +230,7 @@ class PHIPatternManager:
         patterns = self.get_all_patterns()
         pattern_repr = str(sorted([(name, config.pattern, config.enabled) 
                                   for name, config in patterns.items()]))
-        patterns_hash = hashlib.md5(pattern_repr.encode()).hexdigest()
+        patterns_hash = hashlib.md5(pattern_repr.encode(), usedforsecurity=False).hexdigest()
         
         return self.get_compiled_patterns_cached(patterns_hash)
     
@@ -262,7 +262,7 @@ class PHIPatternManager:
         pattern_repr = str(sorted([(name, config.pattern) 
                                   for category in self.categories.values()
                                   for name, config in category.patterns.items()]))
-        validation_key = hashlib.md5(pattern_repr.encode()).hexdigest()
+        validation_key = hashlib.md5(pattern_repr.encode(), usedforsecurity=False).hexdigest()
         
         # Check cache first
         if validation_key in self._validation_cache:
@@ -336,7 +336,7 @@ class PHIPatternManager:
             category_patterns = self.categories[category].patterns
             pattern_repr = str(sorted([(name, config.enabled, config.pattern) 
                                      for name, config in category_patterns.items()]))
-            patterns_hash = hashlib.md5(pattern_repr.encode()).hexdigest()
+            patterns_hash = hashlib.md5(pattern_repr.encode(), usedforsecurity=False).hexdigest()
             return self.get_patterns_by_category_cached(category, patterns_hash)
         return {}
     
