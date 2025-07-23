@@ -11,6 +11,7 @@ import mmap
 import json
 from typing import Iterator, Dict
 
+from .constants import PERFORMANCE_LIMITS, PROCESSING_CONSTANTS
 from .documents import Document, detect_document_type
 from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
 from .phi import PHIRedactor
@@ -77,7 +78,7 @@ class BatchProcessor:
                  performance_monitor: Optional[object] = None) -> None:
         self.processor = HIPAAProcessor(compliance_level=compliance_level)
         self._file_content_cache = {}  # Simple LRU-style cache for file contents
-        self._max_cache_size = 50  # Limit cache to 50 files to prevent memory issues
+        self._max_cache_size = PROCESSING_CONSTANTS.DEFAULT_CACHE_SIZE  # Limit cache to prevent memory issues
         self.performance_monitor = performance_monitor
         
         # Set up processor with monitoring if available
@@ -95,7 +96,7 @@ class BatchProcessor:
         file_size = file_path.stat().st_size
         
         # For small files (< 1MB), use regular read with caching
-        if file_size < 1024 * 1024:
+        if file_size < PROCESSING_CONSTANTS.LARGE_FILE_THRESHOLD:
             content = file_path.read_text(encoding='utf-8', errors='ignore')
             
             # Manage cache size
@@ -124,7 +125,7 @@ class BatchProcessor:
 
     def _preload_files(self, files: List[Path]) -> None:
         """Preload small files into cache to reduce I/O during processing."""
-        small_files = [f for f in files if f.stat().st_size < 512 * 1024]  # < 512KB
+        small_files = [f for f in files if f.stat().st_size < PROCESSING_CONSTANTS.SMALL_FILE_THRESHOLD]
         
         if small_files:
             logger.info("Preloading %d small files into cache", len(small_files))
@@ -186,7 +187,7 @@ class BatchProcessor:
     def _validate_and_setup_workers(self, max_workers: Optional[int]) -> int:
         """Validate and setup optimal worker count."""
         if max_workers is None:
-            max_workers = min(4, max(1, multiprocessing.cpu_count() - 1))
+            max_workers = min(PROCESSING_CONSTANTS.DEFAULT_WORKERS, max(1, multiprocessing.cpu_count() - 1))
             logger.info("Auto-detected optimal workers: %d", max_workers)
         
         if max_workers <= 0:
@@ -248,11 +249,23 @@ class BatchProcessor:
             raise PermissionError(f"Cannot create output directory: {e}")
     
     def _collect_files_to_process(self, in_path: Path) -> List[Path]:
-        """Collect list of files to process from input directory."""
+        """Collect list of files to process from input directory with validation."""
         try:
-            return [f for f in in_path.iterdir() if f.is_file()]
+            files = [f for f in in_path.iterdir() if f.is_file()]
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Permission denied accessing input directory: {e}")
+        
+        # File count validation
+        max_files = PERFORMANCE_LIMITS.MAX_CONCURRENT_JOBS * 1000  # Reasonable limit
+        if len(files) > max_files:
+            raise ValueError(f"Too many files to process: {len(files)} (max {max_files}). Consider using batch processing in smaller chunks.")
+        
+        if len(files) == 0:
+            logger.warning("No files found in directory: %s", in_path)
+        else:
+            logger.info("Found %d files to process", len(files))
+        
+        return files
     
     def _optimize_processing_setup(self, files: List[Path], max_workers: int) -> tuple[List[Path], int]:
         """Optimize file processing order and worker count."""
@@ -283,6 +296,12 @@ class BatchProcessor:
         total = len(files)
         processed = 0
         
+        # Start batch-level memory monitoring
+        batch_id = f"batch_{total}_files"
+        if self.performance_monitor:
+            self.performance_monitor.start_document_processing(batch_id)
+            logger.debug("Started batch memory monitoring for %d files", total)
+        
         try:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks and track futures
@@ -297,6 +316,12 @@ class BatchProcessor:
                         result = future.result()
                         results.append(result)
                         processed += 1
+                        
+                        # Periodic memory monitoring during batch processing
+                        if self.performance_monitor and processed % PROCESSING_CONSTANTS.PROGRESS_REPORT_INTERVAL == 0:
+                            system_metrics = self.performance_monitor.get_system_metrics()
+                            logger.debug("Batch progress %d/%d - Memory usage: %.1f MB", 
+                                       processed, total, system_metrics.memory_usage)
                         
                         if show_progress:
                             status = "✓" if isinstance(result, ProcessingResult) else "✗"
@@ -316,7 +341,21 @@ class BatchProcessor:
                             print(f"[{processed}/{total}] ✗ {file.name}")
                             
         except Exception as e:
+            # End batch monitoring on exception
+            if self.performance_monitor:
+                self.performance_monitor.end_document_processing(
+                    batch_id, success=False, error=str(e)
+                )
             raise RuntimeError(f"Thread pool execution failed: {e}")
+        
+        # End batch monitoring on success
+        if self.performance_monitor:
+            final_metrics = self.performance_monitor.get_system_metrics()
+            self.performance_monitor.end_document_processing(
+                batch_id, success=True, result=None
+            )
+            logger.info("Batch completed - Final memory usage: %.1f MB, Peak: %.1f MB", 
+                       final_metrics.memory_usage, final_metrics.memory_peak)
         
         # Log summary
         self._log_processing_summary(results)
@@ -615,6 +654,27 @@ class BatchProcessor:
                     "max_size": 0
                 }
             }
+    
+    def get_memory_stats(self) -> dict:
+        """Get current memory usage statistics for batch processing."""
+        if not self.performance_monitor:
+            return {"error": "No performance monitor available"}
+        
+        try:
+            system_metrics = self.performance_monitor.get_system_metrics()
+            
+            return {
+                "current_memory_mb": system_metrics.memory_usage,
+                "peak_memory_mb": system_metrics.memory_peak,
+                "cache_memory_usage": {
+                    "file_cache_size": len(self._file_cache),
+                    "file_cache_max": self._max_cache_size,
+                    "phi_cache_info": self.get_cache_performance()
+                }
+            }
+        except Exception as e:
+            logger.error("Failed to get memory stats: %s", e)
+            return {"error": str(e)}
 
     def clear_cache(self) -> None:
         """Clear PHI detection caches and file content cache to free memory."""
