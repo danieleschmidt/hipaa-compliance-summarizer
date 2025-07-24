@@ -48,6 +48,7 @@ class PerformanceLimits:
     MAX_CONCURRENT_JOBS: int = 4
     BATCH_SIZE: int = 100
     CHUNK_SIZE: int = 8192  # For file I/O
+    DEFAULT_READ_CHUNK_SIZE: int = 4096  # Default chunk size for file reading
     
     # Cache limits
     CACHE_MAX_SIZE: int = 1000  # Max cached items
@@ -64,6 +65,7 @@ class PerformanceLimits:
             MAX_CONCURRENT_JOBS=int(os.environ.get('HIPAA_MAX_CONCURRENT_JOBS', cls.MAX_CONCURRENT_JOBS)),
             BATCH_SIZE=int(os.environ.get('HIPAA_BATCH_SIZE', cls.BATCH_SIZE)),
             CHUNK_SIZE=int(os.environ.get('HIPAA_CHUNK_SIZE', cls.CHUNK_SIZE)),
+            DEFAULT_READ_CHUNK_SIZE=int(os.environ.get('HIPAA_DEFAULT_READ_CHUNK_SIZE', cls.DEFAULT_READ_CHUNK_SIZE)),
             CACHE_MAX_SIZE=int(os.environ.get('HIPAA_CACHE_MAX_SIZE', cls.CACHE_MAX_SIZE)),
             CACHE_TTL_SECONDS=int(os.environ.get('HIPAA_CACHE_TTL_SECONDS', cls.CACHE_TTL_SECONDS)),
             NETWORK_TIMEOUT=int(os.environ.get('HIPAA_NETWORK_TIMEOUT', cls.NETWORK_TIMEOUT)),
@@ -133,6 +135,9 @@ class TestConstants:
     SMALL_FILE_SIZE: int = 1024  # 1KB
     MEDIUM_FILE_SIZE: int = 1024 * 1024  # 1MB
     LARGE_FILE_SIZE: int = 60000  # For generating ~1.2MB content
+    TEST_LARGE_TEXT_SIZE: int = 51 * 1024 * 1024  # 51MB for testing large documents
+    TEST_VERY_LARGE_SIZE: int = 105 * 1024 * 1024  # 105MB for testing size limits
+    TEST_MODERATE_SIZE: int = 10 * 1024 * 1024    # 10MB for error handling tests
     
     # Test performance metrics
     TEST_DOCS_PROCESSED: int = 100
@@ -141,6 +146,14 @@ class TestConstants:
     TEST_MEMORY_USAGE: float = 1024.0  # MB
     TEST_DISK_IO: float = 2048.0  # MB
 
+
+# Unit conversion constants
+BYTES_PER_KB: int = 1024
+BYTES_PER_MB: int = 1024 * 1024
+BYTES_PER_GB: int = 1024 * 1024 * 1024
+
+# Legacy constants for backward compatibility
+MAX_FILE_SIZE_51MB = 51 * BYTES_PER_MB  # For test compatibility
 
 # Global instances
 SECURITY_LIMITS = SecurityLimits.from_environment()
