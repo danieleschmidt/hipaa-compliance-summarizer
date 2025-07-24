@@ -1,0 +1,102 @@
+version: "1.0"
+metadata:
+  description: "Automation scope configuration for autonomous coding assistant"
+  created: "2025-07-24T00:00:00Z"
+  owner: "terry-autonomous-assistant"
+
+# Paths where autonomous changes are permitted
+allowed_paths:
+  - "./src/**"
+  - "./tests/**" 
+  - "./docs/**"
+  - "./config/**"
+  - "./backlog.yml"
+  - "./COMPREHENSIVE_BACKLOG.md"
+  - "./TECHNICAL_DEBT_REPORT.md"
+  - "./CHANGELOG.md"
+
+# Paths that require human approval
+restricted_paths:
+  - "./.github/**"           # GitHub workflows and actions
+  - "./pyproject.toml"       # Package configuration
+  - "./requirements.txt"     # Dependencies  
+  - "./LICENSE"              # Legal files
+  - "./README.md"            # Main documentation
+
+# File patterns to avoid
+forbidden_patterns:
+  - "*.key"
+  - "*.pem"
+  - "*.cert"
+  - "*.env"
+  - ".env.*"
+  - "**/secrets/**"
+
+# External repositories (none allowed without explicit approval)
+external_repos: []
+
+# Operations requiring human approval
+requires_approval:
+  - "dependency_changes"     # Changing package dependencies
+  - "api_breaking_changes"   # Public API modifications
+  - "database_migrations"    # Schema changes
+  - "security_configurations" # Auth, crypto, etc.
+  - "ci_cd_changes"         # GitHub Actions, workflows
+
+# Quality gates that must pass
+quality_gates:
+  - name: "tests_pass"
+    command: "python -m pytest"
+    required: true
+    
+  - name: "lint_check"
+    command: "python -m flake8 src/ tests/"
+    required: true
+    
+  - name: "type_check"
+    command: "python -m mypy src/"
+    required: false  # Optional until types are added
+    
+  - name: "security_scan"
+    command: "bandit -r src/"
+    required: true
+    
+  - name: "dependency_audit"
+    command: "pip-audit"
+    required: true
+
+# Risk assessment rules
+risk_assessment:
+  high_risk_patterns:
+    - "auth*"
+    - "security*"
+    - "crypto*"
+    - "*password*"
+    - "*secret*"
+    - "*token*"
+  
+  high_risk_file_sizes:
+    - "> 500 lines"  # Large files need careful review
+  
+  high_risk_functions:
+    - "eval"
+    - "exec"
+    - "subprocess"
+    - "os.system"
+
+# Rollback configuration
+rollback:
+  enable_feature_flags: true
+  create_backup_branches: true
+  max_changes_per_commit: 5
+
+# Notification settings
+notifications:
+  escalate_to_human:
+    - "blocked_tasks"
+    - "failed_quality_gates"
+    - "high_risk_changes"
+    - "scope_violations"
+  
+  daily_reports: true
+  completion_notifications: true
