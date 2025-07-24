@@ -10,6 +10,14 @@
 
 ## Unreleased
 
+### Security & Error Handling Improvements
+- Fix empty except blocks that could silently swallow errors
+- Add proper logging to UnicodeDecodeError in file validation
+- Improve error handling in config URL parsing with warning logs
+- Add error information to cache performance metrics when calculation fails
+- Enhance error visibility for debugging and monitoring
+
+### Features
 - Add `BatchProcessor` for directory processing
 - Document batch processing feature
 - Add CLI utilities for summarizing documents and compliance reporting

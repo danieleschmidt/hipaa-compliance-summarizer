@@ -226,8 +226,9 @@ def validate_content_type(file_path: Path) -> bool:
                     if keyword in text_content:
                         logger.warning("Potentially dangerous script content in: %s", file_path)
                         return False
-            except UnicodeDecodeError:
-                pass  # Binary file, skip text checks
+            except UnicodeDecodeError as e:
+                logger.debug("Cannot decode file as UTF-8, treating as binary: %s", file_path)
+                # Binary file, skip text checks - this is expected and safe
         
         return True
         

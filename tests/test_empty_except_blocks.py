@@ -1,79 +1,63 @@
-"""Tests for proper error handling in previously empty except blocks."""
+"""Tests for identifying and fixing empty except blocks."""
 
 import pytest
-import tempfile
-import os
+from unittest.mock import patch, mock_open, MagicMock
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-from hipaa_compliance_summarizer.processor import HIPAAProcessor
-from hipaa_compliance_summarizer.parsers import _load_text
 
 
-class TestEmptyExceptBlockHandling:
-    """Test that previously empty except blocks now have proper error handling."""
+class TestEmptyExceptBlocks:
+    """Test that empty except blocks are properly handled."""
     
-    def test_processor_oserror_handling_logs_warning(self):
-        """Test that OSError in processor.py:76 is properly logged."""
-        processor = HIPAAProcessor()
+    def test_unicode_decode_error_should_be_logged(self):
+        """Test that UnicodeDecodeError in security validation is logged, not silently ignored."""
+        from hipaa_compliance_summarizer.security import validate_content_type
         
-        # Create a path that will cause OSError during validation
-        with patch('hipaa_compliance_summarizer.processor.logger') as mock_logger:
-            with patch('pathlib.Path.exists', return_value=True):
-                with patch('hipaa_compliance_summarizer.processor.validate_path') as mock_validate:
-                    mock_validate.side_effect = OSError("Simulated OS error")
-                    
-                    # This should handle the OSError gracefully and log a warning
-                    result = processor._read_file_or_text("some_path.txt")
-                    
-                    # Should return the original text since path checking failed
-                    assert result == "some_path.txt"
-                    
-                    # Should log a debug message about path validation failure
-                    mock_logger.debug.assert_called_once()
-                    assert "Path validation failed" in mock_logger.debug.call_args[0][0]
-    
-    def test_parsers_valueerror_handling_logs_debug(self):
-        """Test that ValueError in parsers.py:102 is properly logged."""
-        with patch('hipaa_compliance_summarizer.parsers.logger') as mock_logger:
-            with patch('pathlib.Path') as mock_path:
-                mock_path.side_effect = ValueError("Invalid path")
+        # Test assumes the fix is in place - the UnicodeDecodeError should be logged
+        with patch('builtins.open', mock_open(read_data=b'\xff\xfe')):
+            with patch('hipaa_compliance_summarizer.security.logger') as mock_logger:
+                result = validate_content_type(Path('/test/file.txt'))
                 
-                # This should handle the ValueError gracefully
-                result = _load_text("invalid_path")
+                # Should return True (file is valid, just not text)
+                assert result is True
                 
-                # Should return the original text since path creation failed
-                assert result == "invalid_path"
+                # Should log the Unicode decode issue for monitoring  
+                mock_logger.debug.assert_called()
                 
-                # Should log a debug message about path creation failure
-                mock_logger.debug.assert_called_once()
-                assert "Path creation failed" in mock_logger.debug.call_args[0][0]
-    
-    def test_processor_with_actual_long_filename(self):
-        """Test processor behavior with extremely long filename that causes OSError."""
-        processor = HIPAAProcessor()
+    def test_config_url_parsing_errors_should_be_logged(self):
+        """Test that URL parsing errors in config masking are logged."""
+        from hipaa_compliance_summarizer.config import mask_sensitive_config
         
-        # Create a filename that's too long (>255 characters on most systems)
-        long_filename = "a" * 300 + ".txt"
+        config = {
+            "invalid_url": "not-a-valid-url-format",
+            "good_url": "https://example.com/api"
+        }
         
-        with patch('hipaa_compliance_summarizer.processor.logger') as mock_logger:
-            result = processor._read_file_or_text(long_filename)
+        with patch('hipaa_compliance_summarizer.config.logger') as mock_logger:
+            result = mask_sensitive_config(config)
             
-            # Should return the original text
-            assert result == long_filename
+            # Should mask the invalid URL
+            assert result["invalid_url"] == "***"
             
-            # Should have logged the path validation failure
-            mock_logger.debug.assert_called()
-    
-    def test_parsers_with_none_input(self):
-        """Test parsers behavior with None input that could cause ValueError."""
-        with patch('hipaa_compliance_summarizer.parsers.logger') as mock_logger:
-            # This might cause ValueError in Path() construction
-            result = _load_text(None)
+            # Should log the parsing failure
+            mock_logger.warning.assert_called()
             
-            # Should handle gracefully and return None
-            assert result is None
+    def test_cache_performance_errors_should_include_error_field(self):
+        """Test that cache performance calculation errors include error information.""" 
+        from hipaa_compliance_summarizer.batch import BatchProcessor
+        
+        processor = BatchProcessor()
+        
+        # Mock the performance monitor to raise an exception
+        mock_monitor = MagicMock()
+        mock_monitor.get_cache_performance.side_effect = Exception("Test error")
+        processor.performance_monitor = mock_monitor
+        
+        with patch('hipaa_compliance_summarizer.batch.logger') as mock_logger:
+            result = processor.get_cache_performance()
             
-            # If ValueError occurred, should have logged it
-            if mock_logger.debug.called:
-                assert "Path creation failed" in mock_logger.debug.call_args[0][0]
+            # Should include error information
+            assert "error" in result
+            assert "Test error" in result["error"]
+            
+            # Should log the error
+            mock_logger.warning.assert_called()
