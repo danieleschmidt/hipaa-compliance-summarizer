@@ -8,6 +8,7 @@ import pytest
 from hipaa_compliance_summarizer.processor import HIPAAProcessor, ComplianceLevel
 from hipaa_compliance_summarizer.documents import Document, DocumentType
 from hipaa_compliance_summarizer.security import SecurityError
+from hipaa_compliance_summarizer.constants import TEST_CONSTANTS
 
 
 class TestProcessorSecurityEnhancements:
@@ -55,7 +56,7 @@ class TestProcessorSecurityEnhancements:
             processor.process_document("Text with null\x00byte")
         
         # Test with excessive length - should raise RuntimeError wrapping ValueError
-        large_text = "A" * (51 * 1024 * 1024)  # 51MB
+        large_text = "A" * TEST_CONSTANTS.TEST_LARGE_TEXT_SIZE  # 51MB
         with pytest.raises(RuntimeError, match="Text too large"):
             processor.process_document(large_text)
         
@@ -121,7 +122,7 @@ class TestProcessorSecurityEnhancements:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             # Write enough data to exceed the limit
             chunk = "A" * 1024  # 1KB chunk
-            for _ in range(105 * 1024):  # 105MB
+            for _ in range(TEST_CONSTANTS.TEST_VERY_LARGE_SIZE // 1024):  # 105MB
                 f.write(chunk)
             temp_path = f.name
         

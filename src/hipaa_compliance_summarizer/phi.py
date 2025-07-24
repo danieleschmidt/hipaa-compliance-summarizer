@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple, Optional
 import logging
 
 from .config import CONFIG
+from .constants import PERFORMANCE_LIMITS
 from .phi_patterns import pattern_manager, PHIPatternConfig
 
 logger = logging.getLogger(__name__)
@@ -170,7 +171,7 @@ class PHIRedactor:
             offset += len(self.mask) - (end - start)
         return RedactionResult(redacted_text, entities)
 
-    def redact_file(self, path: str, *, chunk_size: int = 4096) -> RedactionResult:
+    def redact_file(self, path: str, *, chunk_size: int = PERFORMANCE_LIMITS.DEFAULT_READ_CHUNK_SIZE) -> RedactionResult:
         """Redact PHI from a file by streaming its contents."""
         text_parts: list[str] = []
         entities: list[Entity] = []

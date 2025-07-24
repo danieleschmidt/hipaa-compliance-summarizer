@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Optional, Union
 
-from .constants import SECURITY_LIMITS, PROCESSING_CONSTANTS
+from .constants import SECURITY_LIMITS, PROCESSING_CONSTANTS, PERFORMANCE_LIMITS
 from .documents import Document, DocumentType, DocumentError, validate_document
 from .parsers import (
     parse_clinical_note,
@@ -74,7 +74,12 @@ class HIPAAProcessor:
         
         # Handle enum inputs
         if isinstance(level, ComplianceLevel):
-            return level
+            try:
+                # Validate that the enum value is actually valid
+                ComplianceLevel(level.value)
+                return level
+            except (ValueError, AttributeError) as e:
+                raise ValueError(f"Invalid ComplianceLevel enum value: {level}") from e
         
         # Try to convert from int
         if isinstance(level, int):
@@ -87,7 +92,7 @@ class HIPAAProcessor:
 
     def _load_text(self, path_or_text: str) -> str:
         # Only treat as path if it looks like one and is reasonable length
-        if (len(path_or_text) < 4096 and 
+        if (len(path_or_text) < PERFORMANCE_LIMITS.DEFAULT_READ_CHUNK_SIZE and 
             not '\n' in path_or_text and 
             not path_or_text.strip().startswith(' ') and
             (os.path.sep in path_or_text or '.' in path_or_text)):

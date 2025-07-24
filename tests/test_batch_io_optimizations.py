@@ -8,6 +8,7 @@ import pytest
 
 from hipaa_compliance_summarizer.batch import BatchProcessor
 from hipaa_compliance_summarizer.processor import ComplianceLevel
+from hipaa_compliance_summarizer.constants import BYTES_PER_MB
 
 
 class TestBatchIOOptimizations:
@@ -79,7 +80,7 @@ class TestBatchIOOptimizations:
         try:
             # Should use memory mapping for large files
             content = processor._optimized_file_read(temp_path)
-            assert len(content) > 1024 * 1024  # Verify it's large
+            assert len(content) > BYTES_PER_MB  # Verify it's large
             assert "Large file content." in content
             
             # Large files should not be cached
