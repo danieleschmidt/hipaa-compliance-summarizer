@@ -1,0 +1,224 @@
+version: "1.0"
+metadata:
+  last_updated: "2025-07-24T00:00:00Z"
+  total_items: 31
+  methodology: "WSJF = (Business Value + Time Criticality + Risk Reduction) / Effort"
+  scale: [1, 2, 3, 5, 8, 13]
+
+items:
+  # CRITICAL PRIORITY (WSJF: 15+)
+  - id: "CR001"
+    title: "Refactor 283-line process_directory() function"
+    type: "technical_debt"
+    description: "Break down large function into smaller, testable components"
+    acceptance_criteria:
+      - "Function is under 50 lines"
+      - "All functionality preserved"
+      - "Tests pass"
+      - "Code coverage maintained"
+    effort: 8
+    value: 13
+    time_criticality: 8
+    risk_reduction: 13
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  - id: "CR002"
+    title: "Implement empty SecurityError exception classes"
+    type: "bug_fix"
+    description: "Add proper implementation to empty exception classes"
+    acceptance_criteria:
+      - "All SecurityError classes have proper docstrings"
+      - "Error messages are informative"
+      - "Error handling tests added"
+    effort: 2
+    value: 8
+    time_criticality: 13
+    risk_reduction: 13
+    status: "NEW"
+    risk_tier: "HIGH"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  - id: "CR003"
+    title: "Handle empty except blocks (silent failures)"
+    type: "bug_fix"
+    description: "Replace bare except blocks with proper error handling"
+    acceptance_criteria:
+      - "No bare except blocks remain"
+      - "Proper logging for all exceptions"
+      - "Error recovery strategies implemented"
+    effort: 1
+    value: 5
+    time_criticality: 13
+    risk_reduction: 13
+    status: "NEW"
+    risk_tier: "CRITICAL"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  - id: "CR004"
+    title: "Add docstrings to CLI main() functions"
+    type: "documentation"
+    description: "Document all CLI entry points"
+    acceptance_criteria:
+      - "All main() functions have docstrings"
+      - "Usage examples included"
+      - "Parameter documentation complete"
+    effort: 1
+    value: 8
+    time_criticality: 5
+    risk_reduction: 5
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  - id: "CR005"
+    title: "Extract hardcoded file size limits to config"
+    type: "configuration"
+    description: "Move magic numbers to configuration files"
+    acceptance_criteria:
+      - "All hardcoded limits in config"
+      - "Configuration validation added"
+      - "Default values documented"
+    effort: 2
+    value: 5
+    time_criticality: 8
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  # HIGH PRIORITY (WSJF: 8-14.9)
+  - id: "HI001"
+    title: "Refactor 131-line handle() function"
+    type: "technical_debt"
+    description: "Break down large function for better maintainability"
+    acceptance_criteria:
+      - "Function under 50 lines"
+      - "Single responsibility maintained"
+      - "All tests pass"
+    effort: 5
+    value: 8
+    time_criticality: 5
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  - id: "HI002"
+    title: "Add proper error handling in processor.py:76"
+    type: "bug_fix"
+    description: "Replace generic exception handling with specific error types"
+    acceptance_criteria:
+      - "Specific exception types used"
+      - "Proper error logging"
+      - "Error recovery implemented"
+    effort: 2
+    value: 5
+    time_criticality: 8
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-07-23T00:00:00Z"
+    links: ["src/hipaa_compliance_summarizer/processor.py:76"]
+
+  # SECURITY ITEMS
+  - id: "DM001"
+    title: "Security vulnerability scan (bandit)"
+    type: "security"
+    description: "Run comprehensive security scan and fix issues"
+    acceptance_criteria:
+      - "Bandit scan shows 0 high/critical issues"
+      - "All security recommendations addressed"
+      - "Security report generated"
+    effort: 1
+    value: 5
+    time_criticality: 8
+    risk_reduction: 13
+    status: "NEW"
+    risk_tier: "HIGH"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+  - id: "DM002"
+    title: "Dependency audit (pip-audit)"
+    type: "security"
+    description: "Audit dependencies for vulnerabilities"
+    acceptance_criteria:
+      - "All dependencies scanned"
+      - "Vulnerable packages updated"
+      - "Audit report generated"
+    effort: 1
+    value: 3
+    time_criticality: 5
+    risk_reduction: 8
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-07-23T00:00:00Z"
+    links: []
+
+blocked_items:
+  - id: "BL001"
+    title: "HIPAA compliance certification"
+    type: "compliance"
+    description: "Complete HIPAA compliance certification process"
+    effort: 13
+    value: 13
+    time_criticality: 13
+    risk_reduction: 13
+    status: "BLOCKED"
+    risk_tier: "CRITICAL"
+    created_at: "2025-07-23T00:00:00Z"
+    blocker: "Legal review required"
+    links: []
+
+  - id: "BL002"
+    title: "Production deployment guidelines"
+    type: "documentation"
+    description: "Create production deployment documentation"
+    effort: 8
+    value: 8
+    time_criticality: 8
+    risk_reduction: 8
+    status: "BLOCKED"
+    risk_tier: "HIGH"
+    created_at: "2025-07-23T00:00:00Z"
+    blocker: "Infrastructure decisions pending"
+    links: []
+
+automation_scope:
+  allowed_paths:
+    - "./src/**"
+    - "./tests/**"
+    - "./docs/**"
+    - "./config/**"
+  restricted_paths:
+    - "./.github/**"
+    - "./pyproject.toml"
+  external_repos: []
+  
+quality_gates:
+  - name: "tests_pass"
+    description: "All tests must pass"
+    required: true
+  - name: "security_scan"
+    description: "Security scans must show 0 high/critical issues"
+    required: true
+  - name: "code_coverage"
+    description: "Code coverage must not decrease"
+    required: true
+  - name: "documentation"
+    description: "Documentation must be updated for API changes"
+    required: false
+
+metrics:
+  target_wsjf_threshold: 10
+  max_function_length: 50
+  min_test_coverage: 80
+  max_critical_vulnerabilities: 0
