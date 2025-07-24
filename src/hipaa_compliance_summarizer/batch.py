@@ -669,7 +669,7 @@ class BatchProcessor:
                 "current_memory_mb": system_metrics.memory_usage,
                 "peak_memory_mb": system_metrics.memory_peak,
                 "cache_memory_usage": {
-                    "file_cache_size": len(self._file_cache),
+                    "file_cache_size": len(self._file_content_cache),
                     "file_cache_max": self._max_cache_size,
                     "phi_cache_info": self.get_cache_performance()
                 }

@@ -10,6 +10,7 @@ from hipaa_compliance_summarizer.parsers import parse_medical_record, parse_clin
 from hipaa_compliance_summarizer.documents import Document, DocumentType, detect_document_type, DocumentTypeError
 from hipaa_compliance_summarizer.processor import HIPAAProcessor
 from hipaa_compliance_summarizer.batch import BatchProcessor
+from hipaa_compliance_summarizer.constants import TEST_CONSTANTS
 
 
 class TestParserErrorHandling:
@@ -64,13 +65,13 @@ class TestParserErrorHandling:
         """Test parsing extremely large file."""
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
             # Create a large file
-            large_content = "A" * (10 * 1024 * 1024)  # 10MB
+            large_content = "A" * TEST_CONSTANTS.TEST_MODERATE_SIZE  # 10MB
             f.write(large_content)
             temp_path = f.name
         
         try:
             result = parse_medical_record(temp_path)
-            assert len(result) == 10 * 1024 * 1024
+            assert len(result) == TEST_CONSTANTS.TEST_MODERATE_SIZE
         finally:
             os.unlink(temp_path)
 

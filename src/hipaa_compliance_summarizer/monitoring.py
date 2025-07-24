@@ -18,6 +18,8 @@ from pathlib import Path
 from enum import Enum
 import statistics
 
+from .constants import BYTES_PER_MB
+
 logger = logging.getLogger(__name__)
 
 # Optional imports for system monitoring
@@ -284,7 +286,7 @@ class PerformanceMonitor:
             
             # Memory usage
             memory = psutil.virtual_memory()
-            metrics.memory_usage = memory.used / (1024 * 1024)  # Convert to MB
+            metrics.memory_usage = memory.used / BYTES_PER_MB  # Convert to MB
             if metrics.memory_usage > self._peak_memory:
                 self._peak_memory = metrics.memory_usage
             metrics.memory_peak = self._peak_memory

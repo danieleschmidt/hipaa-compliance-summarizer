@@ -5,6 +5,7 @@ import sys
 from argparse import ArgumentParser
 from hipaa_compliance_summarizer import BatchProcessor
 from hipaa_compliance_summarizer.startup import validate_environment, setup_logging_with_config
+from hipaa_compliance_summarizer.monitoring import PerformanceMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +73,16 @@ def main() -> None:
         action="store_true",
         help="Display cache performance metrics after processing",
     )
+    parser.add_argument(
+        "--show-memory-stats",
+        action="store_true",
+        help="Display memory usage statistics after processing",
+    )
     args = parser.parse_args()
 
-    processor = BatchProcessor()
+    # Create performance monitor for memory tracking
+    monitor = PerformanceMonitor()  
+    processor = BatchProcessor(performance_monitor=monitor)
     results = processor.process_directory(
         args.input_dir,
         output_dir=args.output_dir,
@@ -103,6 +111,17 @@ def main() -> None:
               f"Hit Ratio: {cache_performance['phi_detection']['hit_ratio']:.1%}")
         print(f"Cache Memory Usage - Pattern: {cache_performance['pattern_compilation']['current_size']}/{cache_performance['pattern_compilation']['max_size']}, "
               f"PHI: {cache_performance['phi_detection']['current_size']}/{cache_performance['phi_detection']['max_size']}")
+
+    if args.show_memory_stats:
+        memory_stats = processor.get_memory_stats()
+        if "error" not in memory_stats:
+            print("\nMemory Usage Statistics:")
+            print(f"Current Memory Usage: {memory_stats['current_memory_mb']:.1f} MB")
+            print(f"Peak Memory Usage: {memory_stats['peak_memory_mb']:.1f} MB") 
+            cache_info = memory_stats['cache_memory_usage']
+            print(f"File Cache: {cache_info['file_cache_size']}/{cache_info['file_cache_max']} files")
+        else:
+            print(f"\nMemory stats error: {memory_stats['error']}")
 
 
 if __name__ == "__main__":
