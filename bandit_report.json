@@ -1,0 +1,306 @@
+{
+  "errors": [],
+  "generated_at": "2025-07-24T03:31:08Z",
+  "metrics": {
+    "_totals": {
+      "CONFIDENCE.HIGH": 5.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 5.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 3252,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/__init__.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 38,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/batch.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 533,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/cli/__init__.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 1,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/cli/batch_process.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 91,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/cli/compliance_report.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 31,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/cli/summarize.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 32,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/config/__init__.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 112,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/constants.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 104,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/documents.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 137,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/logging_framework.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 474,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/monitoring.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 446,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/parsers.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 177,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/phi.py": {
+      "CONFIDENCE.HIGH": 2.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 2.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 228,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/phi_patterns.py": {
+      "CONFIDENCE.HIGH": 3.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 3.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 287,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/processor.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 197,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/reporting.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 51,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/security.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 213,
+      "nosec": 0
+    },
+    "src/hipaa_compliance_summarizer/startup.py": {
+      "CONFIDENCE.HIGH": 0.0,
+      "CONFIDENCE.LOW": 0.0,
+      "CONFIDENCE.MEDIUM": 0.0,
+      "CONFIDENCE.UNDEFINED": 0.0,
+      "SEVERITY.HIGH": 0.0,
+      "SEVERITY.LOW": 0.0,
+      "SEVERITY.MEDIUM": 0.0,
+      "SEVERITY.UNDEFINED": 0.0,
+      "loc": 100,
+      "nosec": 0
+    }
+  },
+  "results": [
+    {
+      "code": "121         self._patterns_tuple = tuple(sorted(raw_patterns.items()))\n122         self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode(), usedforsecurity=False).hexdigest()\n123         \n",
+      "filename": "src/hipaa_compliance_summarizer/phi.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "MEDIUM",
+      "issue_text": "Use of insecure MD2, MD4, MD5, or SHA1 hash function.",
+      "line_number": 122,
+      "line_range": [
+        122
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b303-md5",
+      "test_id": "B303",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "304         self._patterns_tuple = tuple(sorted(raw_patterns.items()))\n305         self._patterns_hash = hashlib.md5(str(self._patterns_tuple).encode(), usedforsecurity=False).hexdigest()\n306         \n",
+      "filename": "src/hipaa_compliance_summarizer/phi.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "MEDIUM",
+      "issue_text": "Use of insecure MD2, MD4, MD5, or SHA1 hash function.",
+      "line_number": 305,
+      "line_range": [
+        305
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b303-md5",
+      "test_id": "B303",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "232                                   for name, config in patterns.items()]))\n233         patterns_hash = hashlib.md5(pattern_repr.encode(), usedforsecurity=False).hexdigest()\n234         \n",
+      "filename": "src/hipaa_compliance_summarizer/phi_patterns.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "MEDIUM",
+      "issue_text": "Use of insecure MD2, MD4, MD5, or SHA1 hash function.",
+      "line_number": 233,
+      "line_range": [
+        233
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b303-md5",
+      "test_id": "B303",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "264                                   for name, config in category.patterns.items()]))\n265         validation_key = hashlib.md5(pattern_repr.encode(), usedforsecurity=False).hexdigest()\n266         \n",
+      "filename": "src/hipaa_compliance_summarizer/phi_patterns.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "MEDIUM",
+      "issue_text": "Use of insecure MD2, MD4, MD5, or SHA1 hash function.",
+      "line_number": 265,
+      "line_range": [
+        265
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b303-md5",
+      "test_id": "B303",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "338                                      for name, config in category_patterns.items()]))\n339             patterns_hash = hashlib.md5(pattern_repr.encode(), usedforsecurity=False).hexdigest()\n340             return self.get_patterns_by_category_cached(category, patterns_hash)\n",
+      "filename": "src/hipaa_compliance_summarizer/phi_patterns.py",
+      "issue_confidence": "HIGH",
+      "issue_severity": "MEDIUM",
+      "issue_text": "Use of insecure MD2, MD4, MD5, or SHA1 hash function.",
+      "line_number": 339,
+      "line_range": [
+        339
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b303-md5",
+      "test_id": "B303",
+      "test_name": "blacklist"
+    }
+  ]
+}
