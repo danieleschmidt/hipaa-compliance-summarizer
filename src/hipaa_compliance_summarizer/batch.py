@@ -627,8 +627,9 @@ class BatchProcessor:
                         "current_size": int(current_size),
                         "max_size": int(max_size) if max_size is not None else 0
                     }
-                except (ValueError, TypeError, AttributeError):
-                    return {"hits": 0, "misses": 0, "hit_ratio": 0.0, "current_size": 0, "max_size": 0}
+                except (ValueError, TypeError, AttributeError) as e:
+                    logger.warning(f"Failed to parse cache metrics: {e}")
+                    return {"error": str(e), "hits": 0, "misses": 0, "hit_ratio": 0.0, "current_size": 0, "max_size": 0}
             
             return {
                 "pattern_compilation": safe_cache_metrics(pattern_cache),
@@ -637,8 +638,9 @@ class BatchProcessor:
             
         except Exception as e:
             logger.warning("Error calculating cache performance: %s", e)
-            # Return safe defaults
+            # Return error information with safe defaults
             return {
+                "error": f"Failed to calculate cache metrics: {str(e)}",
                 "pattern_compilation": {
                     "hits": 0,
                     "misses": 0,

@@ -147,8 +147,9 @@ def mask_sensitive_config(config: Dict[str, Any]) -> Dict[str, Any]:
                         netloc = parsed.netloc.replace(f":{parsed.password}@", ":***@")
                         masked_url = value.replace(parsed.netloc, netloc)
                         masked[key] = masked_url
-                except Exception:
-                    # If parsing fails, just mask the whole thing
+                except Exception as e:
+                    # If parsing fails, log the issue and mask the whole thing
+                    logger.warning(f"Failed to parse URL for masking key '{key}': {e}")
                     masked[key] = "***"
     
     return masked
