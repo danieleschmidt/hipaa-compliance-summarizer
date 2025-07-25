@@ -7,8 +7,10 @@ to improve maintainability and reduce magic numbers throughout the codebase.
 from __future__ import annotations
 
 import os
+import yaml
 from dataclasses import dataclass
 from typing import Optional
+from pathlib import Path
 
 
 @dataclass
@@ -37,6 +39,19 @@ class SecurityLimits:
             MAX_FILENAME_LENGTH=int(os.environ.get('HIPAA_MAX_FILENAME_LENGTH', cls.MAX_FILENAME_LENGTH)),
             MAX_DOCUMENT_SIZE=int(os.environ.get('HIPAA_MAX_DOCUMENT_SIZE', cls.MAX_DOCUMENT_SIZE)),
             MAX_TEXT_LENGTH=int(os.environ.get('HIPAA_MAX_TEXT_LENGTH', cls.MAX_TEXT_LENGTH)),
+        )
+    
+    @classmethod
+    def from_config(cls, config_dict: dict) -> SecurityLimits:
+        """Create SecurityLimits from configuration dictionary."""
+        security_limits = config_dict.get('limits', {}).get('security', {})
+        return cls(
+            MAX_FILE_SIZE=security_limits.get('max_file_size', cls.MAX_FILE_SIZE),
+            MAX_FILE_SIZE_LARGE=security_limits.get('max_file_size_large', cls.MAX_FILE_SIZE_LARGE),
+            MAX_PATH_LENGTH=security_limits.get('max_path_length', cls.MAX_PATH_LENGTH),
+            MAX_FILENAME_LENGTH=security_limits.get('max_filename_length', cls.MAX_FILENAME_LENGTH),
+            MAX_DOCUMENT_SIZE=security_limits.get('max_document_size', cls.MAX_DOCUMENT_SIZE),
+            MAX_TEXT_LENGTH=security_limits.get('max_text_length', cls.MAX_TEXT_LENGTH),
         )
 
 
@@ -70,6 +85,21 @@ class PerformanceLimits:
             CACHE_TTL_SECONDS=int(os.environ.get('HIPAA_CACHE_TTL_SECONDS', cls.CACHE_TTL_SECONDS)),
             NETWORK_TIMEOUT=int(os.environ.get('HIPAA_NETWORK_TIMEOUT', cls.NETWORK_TIMEOUT)),
             PROCESSING_TIMEOUT=int(os.environ.get('HIPAA_PROCESSING_TIMEOUT', cls.PROCESSING_TIMEOUT)),
+        )
+    
+    @classmethod
+    def from_config(cls, config_dict: dict) -> PerformanceLimits:
+        """Create PerformanceLimits from configuration dictionary."""
+        perf_limits = config_dict.get('limits', {}).get('performance', {})
+        return cls(
+            MAX_CONCURRENT_JOBS=perf_limits.get('max_concurrent_jobs', cls.MAX_CONCURRENT_JOBS),
+            BATCH_SIZE=perf_limits.get('batch_size', cls.BATCH_SIZE),
+            CHUNK_SIZE=perf_limits.get('chunk_size', cls.CHUNK_SIZE),
+            DEFAULT_READ_CHUNK_SIZE=perf_limits.get('default_read_chunk_size', cls.DEFAULT_READ_CHUNK_SIZE),
+            CACHE_MAX_SIZE=perf_limits.get('cache_max_size', cls.CACHE_MAX_SIZE),
+            CACHE_TTL_SECONDS=perf_limits.get('cache_ttl_seconds', cls.CACHE_TTL_SECONDS),
+            NETWORK_TIMEOUT=perf_limits.get('network_timeout', cls.NETWORK_TIMEOUT),
+            PROCESSING_TIMEOUT=perf_limits.get('processing_timeout', cls.PROCESSING_TIMEOUT),
         )
 
 
@@ -114,6 +144,25 @@ class ProcessingConstants:
             DEFAULT_WORKERS=int(os.environ.get('HIPAA_DEFAULT_WORKERS', cls.DEFAULT_WORKERS)),
             CONTROL_CHAR_THRESHOLD=int(os.environ.get('HIPAA_CONTROL_CHAR_THRESHOLD', cls.CONTROL_CHAR_THRESHOLD)),
         )
+    
+    @classmethod
+    def from_config(cls, config_dict: dict) -> 'ProcessingConstants':
+        """Create ProcessingConstants from configuration dictionary."""
+        perf_limits = config_dict.get('limits', {}).get('performance', {})
+        scoring = config_dict.get('scoring', {})
+        return cls(
+            SUMMARY_WIDTH_STRICT=cls.SUMMARY_WIDTH_STRICT,  # Not configurable yet
+            SUMMARY_WIDTH_STANDARD=cls.SUMMARY_WIDTH_STANDARD,  # Not configurable yet
+            SCORING_PENALTY_PER_ENTITY=scoring.get('penalty_per_entity', cls.SCORING_PENALTY_PER_ENTITY),
+            SCORING_PENALTY_CAP=scoring.get('penalty_cap', cls.SCORING_PENALTY_CAP),
+            SCORING_STRICT_MULTIPLIER=scoring.get('strict_multiplier', cls.SCORING_STRICT_MULTIPLIER),
+            DEFAULT_CACHE_SIZE=perf_limits.get('default_cache_size', cls.DEFAULT_CACHE_SIZE),
+            SMALL_FILE_THRESHOLD=perf_limits.get('small_file_threshold', cls.SMALL_FILE_THRESHOLD),
+            LARGE_FILE_THRESHOLD=perf_limits.get('large_file_threshold', cls.LARGE_FILE_THRESHOLD),
+            PROGRESS_REPORT_INTERVAL=cls.PROGRESS_REPORT_INTERVAL,  # Not configurable yet
+            DEFAULT_WORKERS=cls.DEFAULT_WORKERS,  # Not configurable yet
+            CONTROL_CHAR_THRESHOLD=cls.CONTROL_CHAR_THRESHOLD,  # Not configurable yet
+        )
 
 
 @dataclass
@@ -155,7 +204,64 @@ BYTES_PER_GB: int = 1024 * 1024 * 1024
 # Legacy constants for backward compatibility
 MAX_FILE_SIZE_51MB = 51 * BYTES_PER_MB  # For test compatibility
 
-# Global instances
+def load_config_from_file(config_path: Optional[Path] = None) -> dict:
+    """Load configuration from YAML file.
+    
+    Args:
+        config_path: Path to configuration file. If None, searches for config in default locations.
+        
+    Returns:
+        Configuration dictionary, empty if file not found or error loading.
+    """
+    if config_path is None:
+        # Search for config in default locations
+        default_paths = [
+            Path("config/hipaa_config.yml"),
+            Path("../config/hipaa_config.yml"),
+            Path("../../config/hipaa_config.yml"),
+        ]
+        
+        for path in default_paths:
+            if path.exists():
+                config_path = path
+                break
+        
+        if config_path is None:
+            return {}
+    
+    try:
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f) or {}
+    except (FileNotFoundError, yaml.YAMLError, PermissionError):
+        return {}
+
+
+def get_configured_constants(config_dict: Optional[dict] = None):
+    """Get constants configured from file and environment.
+    
+    Args:
+        config_dict: Configuration dictionary. If None, loads from default file locations.
+        
+    Returns:
+        Tuple of (security_limits, performance_limits, processing_constants)
+    """
+    if config_dict is None:
+        config_dict = load_config_from_file()
+    
+    # Create instances from config, with environment taking precedence
+    security_limits = SecurityLimits.from_config(config_dict)
+    security_limits = SecurityLimits.from_environment()  # Override with env vars
+    
+    performance_limits = PerformanceLimits.from_config(config_dict)
+    performance_limits = PerformanceLimits.from_environment()  # Override with env vars
+    
+    processing_constants = ProcessingConstants.from_config(config_dict)
+    processing_constants = ProcessingConstants.from_environment()  # Override with env vars
+    
+    return security_limits, performance_limits, processing_constants
+
+
+# Global instances - can be overridden by calling get_configured_constants()
 SECURITY_LIMITS = SecurityLimits.from_environment()
 PERFORMANCE_LIMITS = PerformanceLimits.from_environment()
 PROCESSING_CONSTANTS = ProcessingConstants.from_environment()
