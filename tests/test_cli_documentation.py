@@ -26,8 +26,9 @@ class TestCLIDocumentation:
                 args = parser.parse_args(['--file', 'test.txt'])
                 assert hasattr(args, 'file')
                 assert hasattr(args, 'compliance_level')
-            except SystemExit:
-                pass  # ArgumentParser may exit on help
+            except SystemExit as e:
+                # ArgumentParser may exit on help or invalid args - verify it's expected
+                self.assertIn(e.code, [0, 2], "SystemExit should be from help (0) or argument error (2)")
     
     def test_batch_process_cli_options(self):
         """Test that batch process CLI has all documented options."""

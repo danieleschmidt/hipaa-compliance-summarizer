@@ -1,7 +1,8 @@
 version: "1.0"
 metadata:
-  last_updated: "2025-07-24T00:00:00Z"
+  last_updated: "2025-07-25T00:00:00Z"
   total_items: 31
+  completed_items: 4
   methodology: "WSJF = (Business Value + Time Criticality + Risk Reduction) / Effort"
   scale: [1, 2, 3, 5, 8, 13]
 
@@ -37,10 +38,11 @@ items:
     value: 8
     time_criticality: 13
     risk_reduction: 13
-    status: "NEW"
+    status: "DONE"
     risk_tier: "HIGH"
     created_at: "2025-07-23T00:00:00Z"
-    links: []
+    completed_at: "2025-07-25T00:00:00Z"
+    links: ["src/hipaa_compliance_summarizer/security.py:29", "tests/test_exception_implementations.py"]
 
   - id: "CR003"
     title: "Handle empty except blocks (silent failures)"
@@ -54,10 +56,11 @@ items:
     value: 5
     time_criticality: 13
     risk_reduction: 13
-    status: "NEW"
+    status: "DONE"
     risk_tier: "CRITICAL"
     created_at: "2025-07-23T00:00:00Z"
-    links: []
+    completed_at: "2025-07-25T00:00:00Z"
+    links: ["tests/test_comprehensive_error_handling.py:304", "tests/test_cli_documentation.py:30"]
 
   - id: "CR004"
     title: "Add docstrings to CLI main() functions"
@@ -71,10 +74,11 @@ items:
     value: 8
     time_criticality: 5
     risk_reduction: 5
-    status: "NEW"
+    status: "DONE"
     risk_tier: "LOW"
     created_at: "2025-07-23T00:00:00Z"
-    links: []
+    completed_at: "2025-07-25T00:00:00Z"
+    links: ["src/hipaa_compliance_summarizer/cli/summarize.py:7", "src/hipaa_compliance_summarizer/cli/compliance_report.py:7", "src/hipaa_compliance_summarizer/cli/batch_process.py:13", "src/cli_autonomous_backlog.py:205"]
 
   - id: "CR005"
     title: "Extract hardcoded file size limits to config"
@@ -88,10 +92,11 @@ items:
     value: 5
     time_criticality: 8
     risk_reduction: 8
-    status: "NEW"
+    status: "DONE"
     risk_tier: "MEDIUM"
     created_at: "2025-07-23T00:00:00Z"
-    links: []
+    completed_at: "2025-07-25T00:00:00Z"
+    links: ["config/hipaa_config.yml:16", "src/hipaa_compliance_summarizer/constants.py:42", "tests/test_config_extraction.py"]
 
   # HIGH PRIORITY (WSJF: 8-14.9)
   - id: "HI001"

@@ -6,7 +6,41 @@ patterns:
   mrn: "\\b(?:MRN|Medical Record|Patient ID)[:.]?\\s*([A-Z]{0,3}\\d{6,12})\\b"
   dea: "\\b(?:DEA|DEA#|DEA Number)[:.]?\\s*([A-Z]{2}\\d{7})\\b"
   insurance_id: "\\b(?:Member ID|Policy|Insurance ID|Subscriber ID)[:.]?\\s*([A-Z0-9]{8,15})\\b"
+
 scoring:
   penalty_per_entity: 0.01
   penalty_cap: 0.2
   strict_multiplier: 1.5
+
+# File size and processing limits (configurable for different environments)
+limits:
+  security:
+    # File size limits in bytes
+    max_file_size: 104857600        # 100MB default
+    max_file_size_large: 209715200  # 200MB for large files
+    max_document_size: 52428800     # 50MB for document processing
+    max_text_length: 1000000        # 1M characters
+    
+    # Path limits
+    max_path_length: 4096
+    max_filename_length: 255
+  
+  performance:
+    # Processing limits  
+    max_concurrent_jobs: 4
+    batch_size: 100
+    chunk_size: 8192                # For file I/O
+    default_read_chunk_size: 4096   # Default chunk size for file reading
+    
+    # File thresholds
+    small_file_threshold: 524288    # 512KB threshold for small files
+    large_file_threshold: 1048576   # 1MB threshold for memory mapping
+    
+    # Cache limits
+    cache_max_size: 1000            # Max cached items
+    cache_ttl_seconds: 3600         # 1 hour
+    default_cache_size: 50          # Maximum files in cache
+    
+    # Timeout values (in seconds)
+    network_timeout: 30
+    processing_timeout: 300         # 5 minutes
