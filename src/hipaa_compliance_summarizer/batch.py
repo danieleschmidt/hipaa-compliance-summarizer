@@ -584,22 +584,24 @@ class BatchProcessor:
             cache_info = PHIRedactor.get_cache_info()
         except (AttributeError, RuntimeError, Exception) as e:
             logger.warning("Cache information not available: %s", e)
-            # Return safe defaults with error information
+            # Return safe defaults with error information embedded
+            error_msg = f"Cache information not available: {str(e)}"
             return {
-                "error": f"Cache information not available: {str(e)}",
                 "pattern_compilation": {
                     "hits": 0,
                     "misses": 0,
                     "hit_ratio": 0.0,
                     "current_size": 0,
-                    "max_size": 0
+                    "max_size": 0,
+                    "error": error_msg
                 },
                 "phi_detection": {
                     "hits": 0,
                     "misses": 0,
                     "hit_ratio": 0.0,
                     "current_size": 0,
-                    "max_size": 0
+                    "max_size": 0,
+                    "error": error_msg
                 }
             }
         
