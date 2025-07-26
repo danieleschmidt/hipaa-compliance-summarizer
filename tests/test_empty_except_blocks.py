@@ -44,20 +44,18 @@ class TestEmptyExceptBlocks:
     def test_cache_performance_errors_should_include_error_field(self):
         """Test that cache performance calculation errors include error information.""" 
         from hipaa_compliance_summarizer.batch import BatchProcessor
+        from hipaa_compliance_summarizer.phi import PHIRedactor
         
         processor = BatchProcessor()
         
-        # Mock the performance monitor to raise an exception
-        mock_monitor = MagicMock()
-        mock_monitor.get_cache_performance.side_effect = Exception("Test error")
-        processor.performance_monitor = mock_monitor
-        
-        with patch('hipaa_compliance_summarizer.batch.logger') as mock_logger:
-            result = processor.get_cache_performance()
-            
-            # Should include error information
-            assert "error" in result
-            assert "Test error" in result["error"]
-            
-            # Should log the error
-            mock_logger.warning.assert_called()
+        # Mock PHIRedactor.get_cache_info to raise an exception
+        with patch.object(PHIRedactor, 'get_cache_info', side_effect=Exception("Test error")):
+            with patch('hipaa_compliance_summarizer.batch.logger') as mock_logger:
+                result = processor.get_cache_performance()
+                
+                # Should include error information
+                assert "error" in result
+                assert "Test error" in result["error"]
+                
+                # Should log the error
+                mock_logger.warning.assert_called()

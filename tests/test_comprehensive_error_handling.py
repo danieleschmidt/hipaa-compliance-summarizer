@@ -302,7 +302,7 @@ class TestErrorRecoveryMechanisms:
             processor.process_document("\x00invalid")
         except RuntimeError as e:
             # Expected to fail - log for testing verification
-            self.assertIn("processing failed", str(e).lower())
+            assert "processing failed" in str(e).lower()
         
         # Next operation should work fine
         result = processor.process_document("Valid medical text")

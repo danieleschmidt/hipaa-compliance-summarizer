@@ -78,7 +78,7 @@ class TestProcessorSecurityEnhancements:
             # Should not raise error but should log warning
             result = processor.process_document(text)
             assert result is not None
-            assert "Suspicious pattern detected" in caplog.text
+            assert "Potentially malicious pattern detected" in caplog.text
 
     def test_processor_handles_valid_medical_text(self):
         """Test that processor handles valid medical text correctly."""

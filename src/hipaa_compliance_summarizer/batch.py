@@ -582,10 +582,11 @@ class BatchProcessor:
         """Get information about PHI detection cache performance."""
         try:
             cache_info = PHIRedactor.get_cache_info()
-        except (AttributeError, RuntimeError) as e:
+        except (AttributeError, RuntimeError, Exception) as e:
             logger.warning("Cache information not available: %s", e)
-            # Return safe defaults
+            # Return safe defaults with error information
             return {
+                "error": f"Cache information not available: {str(e)}",
                 "pattern_compilation": {
                     "hits": 0,
                     "misses": 0,
