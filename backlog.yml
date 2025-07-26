@@ -2,7 +2,7 @@ version: "1.0"
 metadata:
   last_updated: "2025-07-25T00:00:00Z"
   total_items: 31
-  completed_items: 4
+  completed_items: 5
   methodology: "WSJF = (Business Value + Time Criticality + Risk Reduction) / Effort"
   scale: [1, 2, 3, 5, 8, 13]
 
@@ -146,10 +146,11 @@ items:
     value: 5
     time_criticality: 8
     risk_reduction: 13
-    status: "NEW"
+    status: "DONE"
     risk_tier: "HIGH"
     created_at: "2025-07-23T00:00:00Z"
-    links: []
+    completed_at: "2025-07-25T00:00:00Z"
+    links: ["security_scan_results_fixed.json", "tests/test_security_scan_compliance.py"]
 
   - id: "DM002"
     title: "Dependency audit (pip-audit)"
