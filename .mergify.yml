@@ -1,0 +1,39 @@
+pull_request_rules:
+  - name: Merge queue with auto conflict resolution
+    conditions:
+      - label=automerge
+      - status-success=ci
+      - "#approved-reviews-by>=1"
+    actions:
+      queue:
+        name: default
+        method: rebase
+        merge_method: rebase
+        strict_method: rebase
+        update_method: rebase
+  
+  - name: Auto-approve for dependabot
+    conditions:
+      - author=dependabot[bot]
+      - status-success=ci
+    actions:
+      review:
+        type: APPROVE
+      label:
+        add: [automerge]
+
+  - name: Auto-resolve trivial conflicts
+    conditions:
+      - status-success=ci
+      - conflict
+    actions:
+      comment:
+        message: |
+          🤖 This PR has conflicts that may be auto-resolvable.
+          
+          The following strategies will be attempted:
+          - Lock files: prefer incoming version
+          - Documentation: line union merge
+          - Rerere: apply previously resolved conflicts
+          
+          If conflicts remain after auto-resolution, manual intervention will be required.
