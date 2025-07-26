@@ -139,7 +139,7 @@ def mask_sensitive_config(config: Dict[str, Any]) -> Dict[str, Any]:
                     masked[key] = "***"
             
             # Mask URLs that contain passwords
-            elif 'url' in key.lower() and '://' in value:
+            elif 'url' in key.lower():
                 try:
                     parsed = urlparse(value)
                     if parsed.password:
@@ -147,6 +147,10 @@ def mask_sensitive_config(config: Dict[str, Any]) -> Dict[str, Any]:
                         netloc = parsed.netloc.replace(f":{parsed.password}@", ":***@")
                         masked_url = value.replace(parsed.netloc, netloc)
                         masked[key] = masked_url
+                    elif '://' not in value:
+                        # Not a valid URL format, mask it for safety
+                        logger.warning(f"Invalid URL format detected for key '{key}': {value}")
+                        masked[key] = "***"
                 except Exception as e:
                     # If parsing fails, log the issue and mask the whole thing
                     logger.warning(f"Failed to parse URL for masking key '{key}': {e}")

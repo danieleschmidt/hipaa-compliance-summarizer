@@ -253,13 +253,13 @@ def test_phi_redactor_clear_cache_integration():
     cache_info_before = PHIRedactor.get_cache_info()
     
     # Should have some cache activity
-    assert cache_info_before["phi_detection"]["currsize"] > 0
+    assert cache_info_before["phi_detection"].currsize > 0
     
     # Clear all caches
     PHIRedactor.clear_cache()
     
     # Verify all caches are cleared
     cache_info_after = PHIRedactor.get_cache_info()
-    assert cache_info_after["phi_detection"]["currsize"] == 0
-    assert cache_info_after["pattern_compilation"]["currsize"] == 0
+    assert cache_info_after["phi_detection"].currsize == 0
+    assert cache_info_after["pattern_compilation"].currsize == 0
     assert cache_info_after["pattern_manager"]["compiled_patterns"]["currsize"] == 0

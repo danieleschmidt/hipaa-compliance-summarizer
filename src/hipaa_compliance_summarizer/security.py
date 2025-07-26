@@ -219,7 +219,7 @@ def validate_content_type(file_path: Path) -> bool:
         # Check for script content in text files
         if file_path.suffix.lower() in {'.txt', '.html', '.xml'}:
             try:
-                text_content = header.decode('utf-8', errors='ignore').lower()
+                text_content = header.decode('utf-8').lower()
                 dangerous_keywords = ['<script', 'javascript:', 'vbscript:', 'onload=']
                 
                 for keyword in dangerous_keywords:
