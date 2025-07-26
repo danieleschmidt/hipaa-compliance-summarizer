@@ -93,7 +93,7 @@ def main() -> None:
     dash = None
     if args.show_dashboard:
         dash = processor.generate_dashboard(results)
-        print(dash)
+        logger.info(dash)
 
     if args.dashboard_json:
         if dash is None:
@@ -102,26 +102,26 @@ def main() -> None:
 
     if args.show_cache_performance:
         cache_performance = processor.get_cache_performance()
-        print("\nCache Performance:")
-        print(f"Pattern Compilation - Hits: {cache_performance['pattern_compilation']['hits']}, "
+        logger.info("\nCache Performance:")
+        logger.info(f"Pattern Compilation - Hits: {cache_performance['pattern_compilation']['hits']}, "
               f"Misses: {cache_performance['pattern_compilation']['misses']}, "
               f"Hit Ratio: {cache_performance['pattern_compilation']['hit_ratio']:.1%}")
-        print(f"PHI Detection - Hits: {cache_performance['phi_detection']['hits']}, "
+        logger.info(f"PHI Detection - Hits: {cache_performance['phi_detection']['hits']}, "
               f"Misses: {cache_performance['phi_detection']['misses']}, "
               f"Hit Ratio: {cache_performance['phi_detection']['hit_ratio']:.1%}")
-        print(f"Cache Memory Usage - Pattern: {cache_performance['pattern_compilation']['current_size']}/{cache_performance['pattern_compilation']['max_size']}, "
+        logger.info(f"Cache Memory Usage - Pattern: {cache_performance['pattern_compilation']['current_size']}/{cache_performance['pattern_compilation']['max_size']}, "
               f"PHI: {cache_performance['phi_detection']['current_size']}/{cache_performance['phi_detection']['max_size']}")
 
     if args.show_memory_stats:
         memory_stats = processor.get_memory_stats()
         if "error" not in memory_stats:
-            print("\nMemory Usage Statistics:")
-            print(f"Current Memory Usage: {memory_stats['current_memory_mb']:.1f} MB")
-            print(f"Peak Memory Usage: {memory_stats['peak_memory_mb']:.1f} MB") 
+            logger.info("\nMemory Usage Statistics:")
+            logger.info(f"Current Memory Usage: {memory_stats['current_memory_mb']:.1f} MB")
+            logger.info(f"Peak Memory Usage: {memory_stats['peak_memory_mb']:.1f} MB") 
             cache_info = memory_stats['cache_memory_usage']
-            print(f"File Cache: {cache_info['file_cache_size']}/{cache_info['file_cache_max']} files")
+            logger.info(f"File Cache: {cache_info['file_cache_size']}/{cache_info['file_cache_max']} files")
         else:
-            print(f"\nMemory stats error: {memory_stats['error']}")
+            logger.error(f"\nMemory stats error: {memory_stats['error']}")
 
 
 if __name__ == "__main__":

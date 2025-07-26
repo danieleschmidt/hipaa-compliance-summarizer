@@ -13,10 +13,25 @@ import argparse
 import sys
 import json
 import yaml
+import logging
 from pathlib import Path
 from typing import Dict, Any
 
 from autonomous_backlog_assistant import AutonomousBacklogAssistant, TaskStatus, RiskTier
+
+
+def setup_cli_logger() -> logging.Logger:
+    """Set up CLI logger with user-friendly console output."""
+    logger = logging.getLogger('cli_autonomous_backlog')
+    if logger.handlers:
+        return logger
+        
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    return logger
 
 
 def load_automation_scope(repo_root: Path) -> Dict[str, Any]:
@@ -51,7 +66,8 @@ def check_scope_permissions(path: str, scope_config: Dict[str, Any]) -> bool:
 
 def cmd_start(args) -> None:
     """Start autonomous execution"""
-    print("🚀 Starting Autonomous Backlog Assistant")
+    logger = setup_cli_logger()
+    logger.info("🚀 Starting Autonomous Backlog Assistant")
     
     repo_root = Path(args.repo_root) if args.repo_root else Path.cwd()
     
@@ -59,33 +75,34 @@ def cmd_start(args) -> None:
     scope_config = load_automation_scope(repo_root)
     
     if not scope_config:
-        print("⚠️  No automation scope configuration found")
-        print("   Creating default .automation-scope.yaml")
+        logger.warning("⚠️  No automation scope configuration found")
+        logger.info("   Creating default .automation-scope.yaml")
         # Default scope would be created here
     
     # Initialize assistant
     assistant = AutonomousBacklogAssistant(repo_root)
     
     if args.dry_run:
-        print("📋 DRY RUN MODE - No changes will be made")
+        logger.info("📋 DRY RUN MODE - No changes will be made")
         # Discover and report what would be done
         items = assistant.discover_backlog_items()
         assistant.apply_aging_multiplier(items)
         sorted_items = assistant.sort_by_wsjf(items)
         
-        print(f"\nDiscovered {len(items)} backlog items")
-        print("\nTop 5 items by WSJF:")
+        logger.info(f"\nDiscovered {len(items)} backlog items")
+        logger.info("\nTop 5 items by WSJF:")
         for i, item in enumerate(sorted_items[:5], 1):
-            print(f"{i}. {item.id}: {item.title} (WSJF: {item.wsjf_score:.2f})")
+            logger.info(f"{i}. {item.id}: {item.title} (WSJF: {item.wsjf_score:.2f})")
     else:
         # Run autonomous execution
         assistant.execute_macro_loop()
     
-    print("✅ Execution completed")
+    logger.info("✅ Execution completed")
 
 
 def cmd_status(args) -> None:
     """Show backlog status"""
+    logger = setup_cli_logger()
     repo_root = Path(args.repo_root) if args.repo_root else Path.cwd()
     assistant = AutonomousBacklogAssistant(repo_root)
     
@@ -94,8 +111,8 @@ def cmd_status(args) -> None:
     assistant.apply_aging_multiplier(items)
     sorted_items = assistant.sort_by_wsjf(items)
     
-    print(f"📊 Backlog Status")
-    print(f"Total items: {len(items)}")
+    logger.info(f"📊 Backlog Status")
+    logger.info(f"Total items: {len(items)}")
     
     # Count by status
     status_counts = {}
@@ -104,9 +121,9 @@ def cmd_status(args) -> None:
         if count > 0:
             status_counts[status.value] = count
     
-    print("\nStatus distribution:")
+    logger.info("\nStatus distribution:")
     for status, count in status_counts.items():
-        print(f"  {status}: {count}")
+        logger.info(f"  {status}: {count}")
     
     # Count by risk tier
     risk_counts = {}
@@ -115,20 +132,21 @@ def cmd_status(args) -> None:
         if count > 0:
             risk_counts[risk.value] = count
     
-    print("\nRisk distribution:")
+    logger.info("\nRisk distribution:")
     for risk, count in risk_counts.items():
-        print(f"  {risk}: {count}")
+        logger.info(f"  {risk}: {count}")
     
     # Show top WSJF items
-    print(f"\nTop 10 items by WSJF:")
+    logger.info(f"\nTop 10 items by WSJF:")
     for i, item in enumerate(sorted_items[:10], 1):
         status_icon = "🔥" if item.risk_tier == RiskTier.CRITICAL else "⚡" if item.risk_tier == RiskTier.HIGH else "📈"
-        print(f"{i:2d}. {status_icon} {item.id}: {item.title}")
-        print(f"     WSJF: {item.wsjf_score:.2f} | Status: {item.status.value} | Risk: {item.risk_tier.value}")
+        logger.info(f"{i:2d}. {status_icon} {item.id}: {item.title}")
+        logger.info(f"     WSJF: {item.wsjf_score:.2f} | Status: {item.status.value} | Risk: {item.risk_tier.value}")
 
 
 def cmd_report(args) -> None:
     """Generate detailed report"""
+    logger = setup_cli_logger()
     repo_root = Path(args.repo_root) if args.repo_root else Path.cwd()
     assistant = AutonomousBacklogAssistant(repo_root)
     
@@ -138,7 +156,7 @@ def cmd_report(args) -> None:
     assistant.update_metrics()
     assistant.generate_status_report()
     
-    print("📄 Report generated in docs/status/")
+    logger.info("📄 Report generated in docs/status/")
     
     if args.format == 'json':
         # Output JSON for programmatic use
@@ -155,11 +173,12 @@ def cmd_report(args) -> None:
             ],
             'metrics': assistant.metrics
         }
-        print(json.dumps(report_data, indent=2))
+        logger.info(json.dumps(report_data, indent=2))
 
 
 def cmd_scope(args) -> None:
     """Manage automation scope"""
+    logger = setup_cli_logger()
     repo_root = Path(args.repo_root) if args.repo_root else Path.cwd()
     scope_file = repo_root / ".automation-scope.yaml"
     
@@ -167,39 +186,40 @@ def cmd_scope(args) -> None:
         if scope_file.exists():
             with open(scope_file, 'r') as f:
                 config = yaml.safe_load(f)
-            print("📋 Current automation scope:")
-            print(yaml.dump(config, default_flow_style=False))
+            logger.info("📋 Current automation scope:")
+            logger.info(yaml.dump(config, default_flow_style=False))
         else:
-            print("❌ No automation scope configuration found")
+            logger.warning("❌ No automation scope configuration found")
     
     elif args.action == 'check' and args.path:
         scope_config = load_automation_scope(repo_root)
         allowed = check_scope_permissions(args.path, scope_config)
-        print(f"Path '{args.path}': {'✅ ALLOWED' if allowed else '❌ RESTRICTED'}")
+        logger.info(f"Path '{args.path}': {'✅ ALLOWED' if allowed else '❌ RESTRICTED'}")
     
     elif args.action == 'approve' and args.target:
-        print(f"🔓 APPROVE_SCOPE: {args.target}")
+        logger.info(f"🔓 APPROVE_SCOPE: {args.target}")
         # This would be used by the autonomous assistant to gain approval
         # for specific restricted operations
 
 
 def cmd_config(args) -> None:
     """Manage configuration"""
+    logger = setup_cli_logger()
     repo_root = Path(args.repo_root) if args.repo_root else Path.cwd()
     
     if args.action == 'init':
         # Initialize configuration files
-        print("🔧 Initializing autonomous backlog assistant configuration...")
+        logger.info("🔧 Initializing autonomous backlog assistant configuration...")
         
         # Check if files already exist
         backlog_file = repo_root / "backlog.yml"
         scope_file = repo_root / ".automation-scope.yaml"
         
         if backlog_file.exists() and scope_file.exists():
-            print("✅ Configuration files already exist")
+            logger.info("✅ Configuration files already exist")
         else:
-            print("📄 Configuration files would be created here")
-            print("   (Implementation would create default configs)")
+            logger.info("📄 Configuration files would be created here")
+            logger.info("   (Implementation would create default configs)")
 
 
 def main():
@@ -305,10 +325,12 @@ Examples:
         args.func(args)
         return 0
     except KeyboardInterrupt:
-        print("\n❌ Interrupted by user")
+        logger = setup_cli_logger()
+        logger.warning("\n❌ Interrupted by user")
         return 1
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger = setup_cli_logger()
+        logger.error(f"❌ Error: {e}")
         return 1
 
 

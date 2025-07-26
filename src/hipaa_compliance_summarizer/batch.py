@@ -325,7 +325,7 @@ class BatchProcessor:
                         
                         if show_progress:
                             status = "✓" if isinstance(result, ProcessingResult) else "✗"
-                            print(f"[{processed}/{total}] {status} {file.name}")
+                            logger.info(f"[{processed}/{total}] {status} {file.name}")
                             
                     except Exception as e:
                         # Handle exceptions from the future
@@ -338,7 +338,7 @@ class BatchProcessor:
                         processed += 1
                         
                         if show_progress:
-                            print(f"[{processed}/{total}] ✗ {file.name}")
+                            logger.info(f"[{processed}/{total}] ✗ {file.name}")
                             
         except Exception as e:
             # End batch monitoring on exception

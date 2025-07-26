@@ -233,3 +233,82 @@ metrics:
   max_function_length: 50
   min_test_coverage: 80
   max_critical_vulnerabilities: 0
+
+# NEW ITEMS DISCOVERED
+new_items:
+  - id: "NW001"
+    title: "Environment dependency installation issue"
+    type: "infrastructure"
+    description: "Tests failing due to missing dependencies (PyYAML, pytest, etc.) in externally-managed environment"
+    acceptance_criteria:
+      - "All required dependencies available"
+      - "Tests can run successfully"
+      - "Package imports work correctly"
+    effort: 2
+    value: 8
+    time_criticality: 13
+    risk_reduction: 5
+    status: "NEW"
+    risk_tier: "HIGH"
+    created_at: "2025-07-26T17:50:00Z"
+    links: ["requirements.txt", "src/hipaa_compliance_summarizer/__init__.py:1"]
+    notes: "Requires setup of virtual environment or system package installation"
+
+  - id: "NW002"
+    title: "Replace print statements with proper logging in CLI"
+    type: "enhancement"
+    description: "Convert print() calls to structured logging using existing logging framework"
+    acceptance_criteria:
+      - "All print() statements replaced with appropriate logging calls"
+      - "CLI output maintains user-friendly format"
+      - "Logging levels correctly set (INFO, DEBUG, WARNING, etc.)"
+      - "No regression in user experience"
+    effort: 2
+    value: 5
+    time_criticality: 3
+    risk_reduction: 3
+    status: "DONE"
+    risk_tier: "LOW"
+    created_at: "2025-07-26T17:52:00Z"
+    completed_at: "2025-07-26T17:55:00Z"
+    links: ["src/cli_autonomous_backlog.py:54-123", "src/hipaa_compliance_summarizer/logging_framework.py"]
+    notes: "15 print statements found in CLI that should use logging framework"
+
+  - id: "NW003"
+    title: "Replace print statements with logging in HIPAA CLI modules"
+    type: "enhancement"
+    description: "Convert remaining print() calls in HIPAA CLI modules to proper logging"
+    acceptance_criteria:
+      - "All print() statements in CLI modules replaced with logging calls"
+      - "Output maintains user readability for CLI users"
+      - "Appropriate log levels used (INFO for normal output, ERROR for errors)"
+      - "No functional regression"
+    effort: 3
+    value: 5
+    time_criticality: 2
+    risk_reduction: 3
+    status: "DONE"
+    risk_tier: "LOW"
+    created_at: "2025-07-26T17:57:00Z"
+    completed_at: "2025-07-26T18:05:00Z"
+    links: ["src/hipaa_compliance_summarizer/cli/", "src/hipaa_compliance_summarizer/batch.py:328-341"]
+    notes: "~12 print statements found in HIPAA CLI and batch modules"
+
+  - id: "NW004"
+    title: "Check for long functions requiring refactoring"
+    type: "technical_debt"
+    description: "Identify and refactor functions exceeding 50-line threshold"
+    acceptance_criteria:
+      - "All functions under 50 lines"
+      - "Single responsibility maintained"
+      - "Tests still pass"
+      - "Documentation updated"
+    effort: 8
+    value: 8
+    time_criticality: 2
+    risk_reduction: 5
+    status: "NEW"
+    risk_tier: "MEDIUM"
+    created_at: "2025-07-26T17:58:00Z"
+    links: ["src/hipaa_compliance_summarizer/batch.py:700", "src/hipaa_compliance_summarizer/logging_framework.py:621"]
+    notes: "Found files >500 lines that may contain long functions"

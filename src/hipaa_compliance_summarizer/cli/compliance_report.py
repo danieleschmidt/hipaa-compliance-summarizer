@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Generate a simple compliance report."""
 from argparse import ArgumentParser
+import logging
 from hipaa_compliance_summarizer import ComplianceReporter
 
 
@@ -26,14 +27,18 @@ def main() -> None:
     parser.add_argument("--include-recommendations", action="store_true")
     args = parser.parse_args()
 
+    # Set up logging for CLI output
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logger = logging.getLogger(__name__)
+    
     reporter = ComplianceReporter()
     report = reporter.generate_report(
         period=args.audit_period,
         documents_processed=args.documents_processed,
         include_recommendations=args.include_recommendations,
     )
-    print(report.overall_compliance)
-    print(report.recommendations)
+    logger.info(report.overall_compliance)
+    logger.info(report.recommendations)
 
 
 if __name__ == "__main__":
