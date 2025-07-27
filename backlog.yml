@@ -248,11 +248,13 @@ new_items:
     value: 8
     time_criticality: 13
     risk_reduction: 5
-    status: "NEW"
+    status: "BLOCKED"
     risk_tier: "HIGH"
     created_at: "2025-07-26T17:50:00Z"
+    updated_at: "2025-07-27T00:00:00Z"
     links: ["requirements.txt", "src/hipaa_compliance_summarizer/__init__.py:1"]
     notes: "Requires setup of virtual environment or system package installation"
+    blocker: "Externally managed Python environment prevents dependency installation"
 
   - id: "NW002"
     title: "Replace print statements with proper logging in CLI"
@@ -307,8 +309,29 @@ new_items:
     value: 8
     time_criticality: 2
     risk_reduction: 5
-    status: "NEW"
+    status: "DONE"
     risk_tier: "MEDIUM"
     created_at: "2025-07-26T17:58:00Z"
+    updated_at: "2025-07-27T00:00:00Z"
+    completed_at: "2025-07-27T00:00:00Z"
     links: ["src/hipaa_compliance_summarizer/batch.py:700", "src/hipaa_compliance_summarizer/logging_framework.py:621"]
-    notes: "Found files >500 lines that may contain long functions"
+    notes: "Refactored 2 largest functions: 98-line main() in batch_process.py → 5 smaller functions, 88-line main() in cli_autonomous_backlog.py → 3 smaller functions"
+
+  - id: "NW005"
+    title: "Continue refactoring remaining long functions (71-line get_cache_performance)"
+    type: "technical_debt"
+    description: "Refactor get_cache_performance method in BatchProcessor class"
+    acceptance_criteria:
+      - "Function under 50 lines"
+      - "Extract cache metric calculation logic"
+      - "Maintain existing functionality"
+      - "Preserve error handling"
+    effort: 3
+    value: 5
+    time_criticality: 2
+    risk_reduction: 3
+    status: "NEW"
+    risk_tier: "LOW"
+    created_at: "2025-07-27T00:00:00Z"
+    links: ["src/hipaa_compliance_summarizer/batch.py:581-661"]
+    notes: "Next highest priority function (71 lines) for refactoring"
