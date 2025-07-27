@@ -1,0 +1,295 @@
+version: '3.8'
+
+services:
+  # Main application
+  hipaa-summarizer:
+    build:
+      context: .
+      target: production
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: hipaa-compliance-summarizer:latest
+    container_name: hipaa-summarizer
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HIPAA_CONFIG_PATH=/app/config/hipaa_config.yml
+      - DATABASE_URL=postgresql://hipaa:${POSTGRES_PASSWORD}@postgres:5432/hipaa_compliance
+      - CACHE_ENABLED=true
+      - MONITORING_ENABLED=true
+      - METRICS_ENDPOINT=http://prometheus:9090
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - hipaa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import hipaa_compliance_summarizer; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development environment
+  hipaa-dev:
+    build:
+      context: .
+      target: development
+    image: hipaa-compliance-summarizer:dev
+    container_name: hipaa-dev
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - HIPAA_CONFIG_PATH=/app/config/hipaa_config.yml
+      - DATABASE_URL=postgresql://hipaa:${POSTGRES_PASSWORD}@postgres:5432/hipaa_compliance_dev
+    ports:
+      - "8001:8000"
+      - "5678:5678"  # debugpy port
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - hipaa-network
+    profiles:
+      - dev
+    command: /bin/bash
+
+  # Testing environment
+  hipaa-test:
+    build:
+      context: .
+      target: testing
+    image: hipaa-compliance-summarizer:test
+    container_name: hipaa-test
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://hipaa:${POSTGRES_PASSWORD}@postgres:5432/hipaa_compliance_test
+    volumes:
+      - .:/app
+      - ./test-results:/app/test-results
+    depends_on:
+      - postgres-test
+    networks:
+      - hipaa-network
+    profiles:
+      - test
+    command: python -m pytest tests/ -v --cov=hipaa_compliance_summarizer --cov-report=xml --cov-report=html
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hipaa-postgres
+    environment:
+      - POSTGRES_DB=hipaa_compliance
+      - POSTGRES_USER=hipaa
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--auth-host=md5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - hipaa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hipaa -d hipaa_compliance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test database
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: hipaa-postgres-test
+    environment:
+      - POSTGRES_DB=hipaa_compliance_test
+      - POSTGRES_USER=hipaa
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - hipaa-network
+    profiles:
+      - test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hipaa -d hipaa_compliance_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: hipaa-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hipaa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hipaa-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - hipaa-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  # Grafana dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hipaa-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - hipaa-network
+    profiles:
+      - monitoring
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Documentation server
+  docs:
+    build:
+      context: .
+      target: docs
+    image: hipaa-compliance-summarizer:docs
+    container_name: hipaa-docs
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docs:/app/docs:ro
+      - ./README.md:/app/README.md:ro
+      - ./ARCHITECTURE.md:/app/ARCHITECTURE.md:ro
+    networks:
+      - hipaa-network
+    profiles:
+      - docs
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: hipaa-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - hipaa-summarizer
+      - grafana
+      - docs
+    networks:
+      - hipaa-network
+    profiles:
+      - production
+    restart: unless-stopped
+
+  # Log aggregation
+  fluentd:
+    image: fluentd:latest
+    container_name: hipaa-fluentd
+    volumes:
+      - ./logging/fluentd.conf:/fluentd/etc/fluent.conf:ro
+      - ./logs:/var/log/hipaa
+    ports:
+      - "24224:24224"
+    networks:
+      - hipaa-network
+    profiles:
+      - logging
+    restart: unless-stopped
+
+  # Elasticsearch for log storage
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: hipaa-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - hipaa-network
+    profiles:
+      - logging
+    restart: unless-stopped
+
+  # Kibana for log visualization
+  kibana:
+    image: kibana:8.11.0
+    container_name: hipaa-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - hipaa-network
+    profiles:
+      - logging
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  postgres_test_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+
+networks:
+  hipaa-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
