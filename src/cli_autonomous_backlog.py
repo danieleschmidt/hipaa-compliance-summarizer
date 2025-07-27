@@ -222,26 +222,9 @@ def cmd_config(args) -> None:
             logger.info("   (Implementation would create default configs)")
 
 
-def main():
-    """
-    Main CLI entry point for the Autonomous Backlog Assistant.
-    
-    Provides command-line interface for autonomous backlog management including:
-    - Starting autonomous execution with optional dry-run mode
-    - Viewing backlog status with WSJF prioritization
-    - Generating detailed reports in markdown or JSON format
-    - Managing automation scope and permissions
-    - Initializing and validating configuration
-    
-    Returns:
-        int: Exit code (0 for success, 1 for failure/interruption)
-    
-    Examples:
-        $ python -m cli_autonomous_backlog start --dry-run
-        $ python -m cli_autonomous_backlog status
-        $ python -m cli_autonomous_backlog report --format=json
-    """
-    parser = argparse.ArgumentParser(
+def _create_main_parser() -> argparse.ArgumentParser:
+    """Create the main argument parser with base configuration."""
+    return argparse.ArgumentParser(
         description="Autonomous Backlog Assistant - Discover, Prioritize, Execute",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -263,7 +246,10 @@ Examples:
   python -m cli_autonomous_backlog scope check ./src/new_file.py
         """
     )
-    
+
+
+def _setup_subcommands(parser: argparse.ArgumentParser) -> None:
+    """Configure all subcommands for the CLI."""
     parser.add_argument(
         '--repo-root',
         type=str,
@@ -314,7 +300,16 @@ Examples:
         help='Configuration action'
     )
     config_parser.set_defaults(func=cmd_config)
+
+
+def main():
+    """Main CLI entry point for the Autonomous Backlog Assistant.
     
+    Returns:
+        int: Exit code (0 for success, 1 for failure/interruption)
+    """
+    parser = _create_main_parser()
+    _setup_subcommands(parser)
     args = parser.parse_args()
     
     if not args.command:
