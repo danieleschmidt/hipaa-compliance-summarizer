@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: hipaa-summarizer-dev
+    volumes:
+      - .:/workspace:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+      - vscode-extensions:/home/vscode/.vscode-server/extensions
+      - vscode-settings:/home/vscode/.vscode-server
+    environment:
+      - PYTHONPATH=/workspace/src
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - APP_ENV=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - HIPAA_CONFIG_PATH=/workspace/config/hipaa_config.yml
+    ports:
+      - "8000:8000"  # API Server
+      - "8080:8080"  # Health Check
+      - "9090:9090"  # Metrics (Prometheus)
+      - "3000:3000"  # Dashboard (Grafana)
+      - "5432:5432"  # PostgreSQL (if needed)
+      - "6379:6379"  # Redis (if needed)
+    networks:
+      - hipaa-dev-network
+    depends_on:
+      - postgres-dev
+      - redis-dev
+    working_dir: /workspace
+    user: vscode
+    command: sleep infinity
+
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: hipaa-postgres-dev
+    environment:
+      POSTGRES_DB: hipaa_compliance_dev
+      POSTGRES_USER: hipaa_user
+      POSTGRES_PASSWORD: dev_password_change_in_production
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - hipaa-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hipaa_user -d hipaa_compliance_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-dev:
+    image: redis:7-alpine
+    container_name: hipaa-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - hipaa-dev-network
+    command: redis-server --appendonly yes --requirepass dev_redis_password
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: hipaa-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-dev-data:/prometheus
+    networks:
+      - hipaa-dev-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: hipaa-grafana-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-dev-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    networks:
+      - hipaa-dev-network
+    depends_on:
+      - prometheus-dev
+
+  mailhog-dev:
+    image: mailhog/mailhog:latest
+    container_name: hipaa-mailhog-dev
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - hipaa-dev-network
+
+  minio-dev:
+    image: minio/minio:latest
+    container_name: hipaa-minio-dev
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    volumes:
+      - minio-dev-data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    networks:
+      - hipaa-dev-network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  vscode-extensions:
+    name: hipaa-vscode-extensions
+  vscode-settings:
+    name: hipaa-vscode-settings
+  postgres-dev-data:
+    name: hipaa-postgres-dev-data
+  redis-dev-data:
+    name: hipaa-redis-dev-data
+  prometheus-dev-data:
+    name: hipaa-prometheus-dev-data
+  grafana-dev-data:
+    name: hipaa-grafana-dev-data
+  minio-dev-data:
+    name: hipaa-minio-dev-data
+
+networks:
+  hipaa-dev-network:
+    name: hipaa-dev-network
+    driver: bridge

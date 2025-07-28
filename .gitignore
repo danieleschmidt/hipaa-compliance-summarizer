@@ -192,3 +192,113 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# HIPAA Compliance Summarizer Specific
+# =====================================
+
+# PHI and Healthcare Data (CRITICAL: Never commit real patient data)
+**/phi_data/
+**/patient_data/
+**/medical_records/
+**/hipaa_data/
+*.phi
+*.hl7
+*.dicom
+*real_patient*
+*actual_phi*
+
+# Processed Documents and Reports
+processed/
+uploads/
+temp/
+reports/
+output/
+redacted/
+
+# Logs (may contain sensitive information)
+logs/
+*.log
+audit_logs/
+security_logs/
+compliance_logs/
+access_logs/
+
+# Security and Compliance Files
+security_scan_results.json
+vulnerability_reports/
+compliance_reports/
+audit_reports/
+pen_test_results/
+
+# Environment and Configuration (may contain secrets)
+.env.local
+.env.production
+.env.staging
+config/local_*
+config/production_*
+config/staging_*
+secrets/
+*.key
+*.pem
+*.p12
+*.jks
+
+# Database files (may contain PHI)
+*.db
+*.sqlite
+*.sqlite3
+database/
+db_backups/
+db_dumps/
+
+# Cache and Temporary Files
+cache/
+tmp/
+.cache/
+phi_cache/
+pattern_cache/
+
+# Development and Testing
+test_data/real_*
+test_phi/
+sample_patient_data/
+mock_phi/
+.pytest_local/
+
+# Docker and Container Data
+.docker/
+docker-compose.override.yml
+docker-compose.local.yml
+volumes/
+mounts/
+
+# IDE and Editor Files
+.vscode/settings.json
+.vscode/launch.json
+*.swp
+*.swo
+*~
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*.orig
+backup/
+backups/
+
+# Monitoring and Metrics
+metrics/
+monitoring_data/
+performance_logs/
+grafana_data/
+prometheus_data/

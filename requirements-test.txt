@@ -1,0 +1,86 @@
+# HIPAA Compliance Summarizer - Test Dependencies
+# Additional dependencies for testing beyond those in requirements.txt
+
+# Core testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-xdist>=3.3.1  # Parallel testing
+pytest-mock>=3.11.1
+pytest-html>=3.2.0  # HTML test reports
+pytest-json-report>=1.5.0  # JSON test reports
+pytest-timeout>=2.1.0  # Test timeouts
+pytest-benchmark>=4.0.0  # Performance benchmarking
+pytest-randomly>=3.12.0  # Random test order
+pytest-clarity>=1.0.1  # Better test output
+pytest-sugar>=0.9.7  # Better test progress
+
+# Performance testing
+pytest-benchmark>=4.0.0
+memory-profiler>=0.61.0
+psutil>=5.9.0  # System resource monitoring
+
+# Security testing
+pytest-security>=0.1.0
+bandit>=1.7.5
+safety>=2.3.5
+
+# Test data and mocking
+factory-boy>=3.3.0  # Test data generation
+faker>=19.6.2  # Fake data generation
+responses>=0.23.3  # HTTP mocking
+requests-mock>=1.11.0  # HTTP request mocking
+freezegun>=1.2.2  # Time mocking
+
+# Database testing (if needed)
+pytest-postgresql>=5.0.0
+pytest-redis>=3.0.2
+
+# Healthcare-specific testing
+python-dateutil>=2.8.2  # Date handling for healthcare data
+jsonschema>=4.19.0  # JSON schema validation
+
+# Compliance and audit testing
+defusedxml>=0.7.1  # Secure XML parsing
+cryptography>=41.0.4  # Encryption testing
+
+# API testing
+httpx>=0.24.1  # HTTP client for API testing
+fastapi[all]>=0.103.0  # If testing FastAPI endpoints
+
+# Load testing
+locust>=2.16.1  # Load testing framework
+
+# Documentation testing
+pytest-doctestplus>=1.0.0  # Enhanced doctest support
+
+# Code quality in tests
+pytest-pylint>=0.21.0
+pytest-mypy>=0.10.3
+pytest-flake8>=1.1.1
+
+# Container testing
+testcontainers>=3.7.1  # Docker container testing
+
+# Mutation testing
+mutmut>=2.4.3  # Mutation testing
+
+# Test fixtures and utilities
+pytest-factoryboy>=2.5.1  # Factory integration
+pytest-lazy-fixture>=0.6.3  # Lazy fixture evaluation
+
+# Healthcare document testing
+python-magic>=0.4.27  # File type detection
+PyPDF2>=3.0.1  # PDF processing for tests
+python-docx>=0.8.11  # DOCX processing for tests
+
+# Synthetic data generation for healthcare
+mimesis>=11.1.0  # Synthetic data generation
+
+# Development and debugging
+pytest-pdb>=0.2.0  # PDB integration
+pytest-pudb>=0.7.0  # PuDB integration (visual debugger)
+
+# Reporting and visualization
+pytest-json>=0.4.0  # JSON output
+matplotlib>=3.7.2  # Charts in test reports
+seaborn>=0.12.2  # Statistical visualizations
