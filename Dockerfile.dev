@@ -1,0 +1,107 @@
+# HIPAA Compliance Summarizer - Development Dockerfile
+FROM mcr.microsoft.com/devcontainers/python:1-3.11-bullseye
+
+# Set environment variables for development
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Create workspace directory
+WORKDIR /workspace
+
+# Install system dependencies for healthcare document processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Document processing tools
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    poppler-utils \
+    antiword \
+    pandoc \
+    imagemagick \
+    libmagic1 \
+    wkhtmltopdf \
+    # Development tools
+    curl \
+    wget \
+    jq \
+    tree \
+    htop \
+    vim \
+    git-lfs \
+    # Security tools
+    gnupg2 \
+    ca-certificates \
+    # Performance monitoring
+    sysstat \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# Install additional Python development tools
+RUN pip install --no-cache-dir \
+    pytest>=7.0.0 \
+    pytest-cov>=4.0.0 \
+    pytest-xdist>=3.0.0 \
+    pytest-mock>=3.10.0 \
+    black>=23.0.0 \
+    ruff>=0.1.0 \
+    mypy>=1.5.0 \
+    pre-commit>=3.0.0 \
+    bandit>=1.7.0 \
+    safety>=2.0.0 \
+    pip-audit>=2.6.0 \
+    coverage>=7.0.0 \
+    flake8>=6.0.0 \
+    isort>=5.12.0 \
+    pydocstyle>=6.3.0 \
+    pylint>=2.17.0 \
+    jupyter>=1.0.0 \
+    ipykernel>=6.0.0 \
+    jupyterlab>=4.0.0
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /workspace/{logs,temp,processed,uploads,reports} \
+    && mkdir -p /workspace/data/{input,output,cache} \
+    && mkdir -p /workspace/{.pytest_cache,.mypy_cache,.ruff_cache} \
+    && chown -R vscode:vscode /workspace
+
+# Switch to vscode user for development
+USER vscode
+
+# Set up the environment
+ENV PYTHONPATH="/workspace/src" \
+    HIPAA_CONFIG_PATH="/workspace/config/hipaa_config.yml" \
+    APP_ENV="development" \
+    DEBUG="true" \
+    LOG_LEVEL="DEBUG"
+
+# Copy requirements first for better caching
+COPY --chown=vscode:vscode requirements.txt /workspace/
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Set up Jupyter kernel
+RUN python -m ipykernel install --user --name hipaa-summarizer --display-name "HIPAA Summarizer"
+
+# Create development aliases
+RUN echo 'alias ll="ls -alF"' >> ~/.bashrc \
+    && echo 'alias la="ls -A"' >> ~/.bashrc \
+    && echo 'alias l="ls -CF"' >> ~/.bashrc \
+    && echo 'alias hipaa-test="python -m pytest -v"' >> ~/.bashrc \
+    && echo 'alias hipaa-cov="python -m pytest --cov=hipaa_compliance_summarizer --cov-report=html"' >> ~/.bashrc \
+    && echo 'alias hipaa-lint="ruff check src/ tests/"' >> ~/.bashrc \
+    && echo 'alias hipaa-format="ruff format src/ tests/"' >> ~/.bashrc \
+    && echo 'alias hipaa-type="mypy src/"' >> ~/.bashrc \
+    && echo 'alias hipaa-security="bandit -r src/"' >> ~/.bashrc \
+    && echo 'alias hipaa-audit="pip-audit"' >> ~/.bashrc \
+    && echo 'alias hipaa-clean="find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true"' >> ~/.bashrc
+
+# Health check for development container
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
+
+# Default command for development
+CMD ["sleep", "infinity"]
