@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# HIPAA Compliance Summarizer - Development Environment Setup
+# HIPAA Compliance Summarizer - Development Environment Setup  
 # This script configures the development environment after container creation
+# Enhanced for advanced SDLC practices
 
 set -e
 
