@@ -1,0 +1,196 @@
+name: 🐛 Bug Report
+description: Report a bug in HIPAA Compliance Summarizer
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out this form completely to help us understand and fix the issue.
+        
+        ⚠️ **Security Notice**: If this is a security vulnerability, please report it privately via our security policy instead.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight Checklist
+      description: Please verify these steps before submitting
+      options:
+        - label: I have searched existing issues to ensure this isn't a duplicate
+          required: true
+        - label: I have checked the documentation for solutions
+          required: true
+        - label: This is not a security vulnerability (use security reporting for those)
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of HIPAA Compliance Summarizer are you using?
+      placeholder: "0.0.1 or commit hash"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: What environment are you running in?
+      options:
+        - Local Development
+        - Docker Container
+        - Cloud Deployment (AWS)
+        - Cloud Deployment (Azure)
+        - Cloud Deployment (GCP)
+        - On-Premises Server
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: python_version
+    attributes:
+      label: Python Version
+      description: What Python version are you using?
+      options:
+        - Python 3.8
+        - Python 3.9
+        - Python 3.10
+        - Python 3.11
+        - Python 3.12
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: "The application crashes when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: "I expected the application to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: "Instead, the application..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the bug
+      placeholder: |
+        1. Run command '...'
+        2. Process document '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_logs
+    attributes:
+      label: Error Logs
+      description: |
+        Paste any relevant error logs here. 
+        ⚠️ **IMPORTANT**: Remove any PHI or sensitive information before pasting
+      render: shell
+      placeholder: |
+        Paste error logs here (with PHI removed)
+
+  - type: textarea
+    id: sample_data
+    attributes:
+      label: Sample Data (De-identified)
+      description: |
+        If applicable, provide a minimal example that reproduces the issue.
+        ⚠️ **CRITICAL**: Only use completely de-identified or synthetic data
+      placeholder: |
+        Sample document format or structure (no real PHI)
+
+  - type: checkboxes
+    id: hipaa_compliance
+    attributes:
+      label: HIPAA Compliance Check
+      description: Compliance verification for healthcare environment
+      options:
+        - label: No PHI or sensitive data is included in this report
+          required: true
+        - label: This bug affects PHI processing and needs security review
+        - label: This bug impacts audit trail functionality
+        - label: This bug affects access controls
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - Critical (System unusable, data loss, security breach)
+        - High (Major functionality broken)
+        - Medium (Feature impaired but workaround exists)
+        - Low (Minor issue, cosmetic problem)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      description: How often does this bug occur?
+      options:
+        - Always (100%)
+        - Often (75-99%)
+        - Sometimes (25-75%)
+        - Rarely (1-25%)
+        - Once (Unable to reproduce)
+    validations:
+      required: true
+
+  - type: textarea
+    id: system_info
+    attributes:
+      label: System Information
+      description: Additional system information
+      placeholder: |
+        - OS: Ubuntu 20.04
+        - Memory: 16GB
+        - CPU: Intel i7
+        - Docker Version: 20.10.8
+        - Any other relevant system details
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or information about the bug
+      placeholder: Add any other context about the problem here
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you like to help fix this bug?
+      options:
+        - label: I would like to work on fixing this bug
+        - label: I can provide additional testing
+        - label: I can review the fix once implemented

@@ -1,0 +1,21 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Critical Security Vulnerability
+    url: https://github.com/danieleschmidt/hipaa-compliance-summarizer/security/advisories/new
+    about: Report critical security vulnerabilities privately (REQUIRED for serious security issues)
+  
+  - name: 📚 Documentation
+    url: https://github.com/danieleschmidt/hipaa-compliance-summarizer/blob/main/README.md
+    about: Read the documentation and user guides
+  
+  - name: 💬 Discussions
+    url: https://github.com/danieleschmidt/hipaa-compliance-summarizer/discussions
+    about: Ask questions, share ideas, and discuss with the community
+  
+  - name: 🏥 HIPAA Compliance Questions
+    url: https://github.com/danieleschmidt/hipaa-compliance-summarizer/discussions/categories/hipaa-compliance
+    about: Discuss HIPAA compliance, healthcare regulations, and industry best practices
+  
+  - name: 🚑 Emergency Support
+    url: mailto:emergency@hipaa-summarizer.com
+    about: For urgent production issues affecting patient care (healthcare organizations only)

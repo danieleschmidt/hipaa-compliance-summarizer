@@ -1,0 +1,91 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "security-team"
+      - "core-developers"
+    assignees:
+      - "maintainer-team"
+    labels:
+      - "dependencies"
+      - "security"
+      - "automated"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    # Security updates get priority
+    allow:
+      - dependency-type: "all"
+    # Group non-security updates to reduce PR noise
+    groups:
+      minor-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Always create individual PRs for security updates
+    ignore:
+      # Let security updates come through individually
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "devops-team"
+      - "security-team"
+    assignees:
+      - "maintainer-team"
+    labels:
+      - "github-actions"
+      - "ci-cd"
+      - "automated"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    
+  # Docker base images (if using dependabot-compatible base images)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "devops-team"
+      - "security-team"
+    assignees:
+      - "maintainer-team"
+    labels:
+      - "docker"
+      - "security"
+      - "automated"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+# Security-focused configuration for healthcare compliance
+# - Weekly updates ensure timely security patches
+# - Security team review for all dependency changes
+# - Separate PRs for security updates to enable fast review
+# - Limited concurrent PRs to avoid overwhelming maintainers
+# - Clear labeling for triage and automation

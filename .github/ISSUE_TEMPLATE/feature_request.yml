@@ -1,0 +1,214 @@
+name: 🚀 Feature Request
+description: Suggest a new feature for HIPAA Compliance Summarizer
+title: "[FEATURE] "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a new feature! Please fill out this form to help us understand your request.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight Checklist
+      description: Please verify these steps before submitting
+      options:
+        - label: I have searched existing issues to ensure this isn't a duplicate
+          required: true
+        - label: I have reviewed the roadmap to see if this is already planned
+          required: true
+        - label: This feature aligns with HIPAA compliance requirements
+          required: true
+
+  - type: dropdown
+    id: feature_category
+    attributes:
+      label: Feature Category
+      description: What category does this feature fall into?
+      options:
+        - PHI Detection & Redaction
+        - Compliance Reporting
+        - Document Processing
+        - Security Enhancement
+        - Performance Improvement
+        - User Interface/Experience
+        - Integration (EHR, APIs)
+        - Monitoring & Observability
+        - Developer Tools
+        - Documentation
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical (Blocking current work)
+        - High (Important for workflow)
+        - Medium (Would be helpful)
+        - Low (Nice to have)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: "Currently, users cannot... which makes it difficult to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed solution in detail
+      placeholder: "I would like to see a feature that..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: Use Cases
+      description: Describe specific use cases for this feature
+      placeholder: |
+        1. As a healthcare administrator, I want to...
+        2. As a compliance officer, I need to...
+        3. As a developer, I would like to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What would make this feature complete?
+      placeholder: |
+        - [ ] Feature does X
+        - [ ] Feature handles Y scenario
+        - [ ] Feature maintains HIPAA compliance
+        - [ ] Feature includes proper documentation
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: hipaa_considerations
+    attributes:
+      label: HIPAA Compliance Considerations
+      description: How does this feature relate to HIPAA compliance?
+      options:
+        - label: This feature enhances PHI protection
+        - label: This feature improves audit trail capabilities
+        - label: This feature strengthens access controls
+        - label: This feature requires security review
+        - label: This feature affects data retention policies
+        - label: This feature impacts business associate agreements
+
+  - type: textarea
+    id: technical_requirements
+    attributes:
+      label: Technical Requirements
+      description: Any specific technical requirements or constraints?
+      placeholder: |
+        - Must support Python 3.8+
+        - Should integrate with existing CLI
+        - Requires database migration
+        - Needs new API endpoints
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives_considered
+    attributes:
+      label: Alternatives Considered
+      description: What alternatives have you considered?
+      placeholder: "I also considered... but decided against it because..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: effort_estimate
+    attributes:
+      label: Implementation Effort (Estimate)
+      description: How complex do you think this feature would be to implement?
+      options:
+        - Small (Few hours to 1 day)
+        - Medium (1-5 days)
+        - Large (1-2 weeks)
+        - X-Large (Multiple weeks)
+        - Unknown/Unsure
+    validations:
+      required: false
+
+  - type: textarea
+    id: mockups_examples
+    attributes:
+      label: Mockups or Examples
+      description: |
+        Include mockups, screenshots, or examples if applicable.
+        You can drag and drop images here.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: breaking_changes
+    attributes:
+      label: Breaking Changes
+      description: Consider the impact of this feature
+      options:
+        - label: This feature may require breaking changes to existing APIs
+        - label: This feature may require database schema changes
+        - label: This feature may affect existing configurations
+        - label: This feature is backward compatible
+
+  - type: textarea
+    id: security_implications
+    attributes:
+      label: Security Implications
+      description: Any security considerations for this feature?
+      placeholder: |
+        - New attack vectors
+        - Data exposure risks
+        - Authentication/authorization impacts
+        - Audit requirements
+    validations:
+      required: false
+
+  - type: textarea
+    id: performance_impact
+    attributes:
+      label: Performance Impact
+      description: How might this feature affect system performance?
+      placeholder: |
+        - Memory usage increase
+        - Processing time impact
+        - Storage requirements
+        - Network traffic changes
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you like to help implement this feature?
+      options:
+        - label: I would like to implement this feature
+        - label: I can help with design and planning
+        - label: I can provide testing and feedback
+        - label: I can help with documentation
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other information about this feature request
+      placeholder: Add any other context, links, or information about the feature request here
