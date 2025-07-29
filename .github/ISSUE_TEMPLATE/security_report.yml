@@ -1,0 +1,223 @@
+name: 🔒 Security Report
+description: Report a security vulnerability (for non-critical issues only)
+title: "[SECURITY] "
+labels: ["security", "needs-triage", "priority-high"]
+assignees: ["@security-team"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Security Vulnerability Report
+        
+        ⚠️ **IMPORTANT SECURITY NOTICE** ⚠️
+        
+        **For Critical Security Vulnerabilities:**
+        Please DO NOT use this public issue template. Instead, report critical vulnerabilities privately via:
+        - Email: security@hipaa-summarizer.com
+        - GitHub Security Advisory: Use "Report a vulnerability" in the Security tab
+        
+        **Use this template only for:**
+        - Non-critical security improvements
+        - Security hardening suggestions
+        - Configuration security issues
+        - Documentation security gaps
+        
+        **Before reporting, ensure this is not a false positive by reviewing our security documentation.**
+
+  - type: checkboxes
+    id: security_preflight
+    attributes:
+      label: Security Reporting Checklist
+      description: Please verify these items before proceeding
+      options:
+        - label: This is NOT a critical security vulnerability requiring immediate attention
+          required: true
+        - label: I have verified this is a legitimate security concern, not a false positive
+          required: true
+        - label: I have not included sensitive system information in this report
+          required: true
+        - label: I understand this report will be publicly visible
+          required: true
+
+  - type: dropdown
+    id: severity_level
+    attributes:
+      label: Severity Level
+      description: How severe is this security issue?
+      options:
+        - Low (Informational, security hardening)
+        - Medium (Moderate risk, requires attention)
+        - High (Significant risk but not immediately exploitable)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: security_category
+    attributes:
+      label: Security Category
+      description: What type of security issue is this?
+      options:
+        - Input Validation
+        - Authentication/Authorization
+        - Data Encryption
+        - Configuration Security
+        - Dependency Vulnerability
+        - Information Disclosure
+        - Access Control
+        - Audit/Logging
+        - PHI Protection
+        - HIPAA Compliance
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: security_description
+    attributes:
+      label: Security Issue Description
+      description: |
+        Describe the security issue in detail.
+        ⚠️ Do not include actual exploit code or sensitive system details
+      placeholder: "The application has a potential security issue where..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected_components
+    attributes:
+      label: Affected Components
+      description: Which parts of the system are affected?
+      placeholder: |
+        - PHI processing module
+        - Authentication system
+        - Configuration files
+        - Third-party dependencies
+    validations:
+      required: true
+
+  - type: textarea
+    id: potential_impact
+    attributes:
+      label: Potential Impact
+      description: What could happen if this security issue is exploited?
+      placeholder: |
+        - Potential for data exposure
+        - Unauthorized access to features
+        - Bypass of security controls
+        - Impact on HIPAA compliance
+    validations:
+      required: true
+
+  - type: dropdown
+    id: exploitability
+    attributes:
+      label: Exploitability
+      description: How difficult would it be to exploit this issue?
+      options:
+        - Very Difficult (Requires admin access, specific conditions)
+        - Difficult (Requires authenticated access, technical knowledge)
+        - Moderate (Requires some prerequisites)
+        - Easy (Can be exploited by any user)
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to Demonstrate (Safely)
+      description: |
+        How can this issue be safely demonstrated without actually exploiting it?
+        ⚠️ Do not provide actual exploitation steps
+      placeholder: |
+        1. Configure the system with...
+        2. Navigate to...
+        3. Observe that security control is missing...
+    validations:
+      required: true
+
+  - type: textarea
+    id: remediation_suggestions
+    attributes:
+      label: Suggested Remediation
+      description: How do you recommend fixing this security issue?
+      placeholder: |
+        - Implement input validation for...
+        - Add authentication check to...
+        - Update configuration to...
+        - Upgrade dependency to version...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: hipaa_impact
+    attributes:
+      label: HIPAA Compliance Impact
+      description: How does this security issue affect HIPAA compliance?
+      options:
+        - label: Could lead to PHI exposure
+        - label: Affects audit trail integrity
+        - label: Impacts access controls for PHI
+        - label: Violates minimum necessary standard
+        - label: Affects business associate agreement compliance
+        - label: No direct HIPAA impact
+
+  - type: textarea
+    id: environment_details
+    attributes:
+      label: Environment Details
+      description: |
+        What environment did you observe this in?
+        ⚠️ Do not include sensitive configuration details
+      placeholder: |
+        - Version: 0.0.1
+        - Deployment: Docker container
+        - Configuration: Standard setup
+        - OS: Ubuntu 20.04
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: vulnerability_disclosure
+    attributes:
+      label: Responsible Disclosure
+      description: Commitment to responsible disclosure practices
+      options:
+        - label: I will not publicly disclose details until this issue is resolved
+          required: true
+        - label: I will not share this information with unauthorized parties
+          required: true
+        - label: I understand this report may take time to investigate and resolve
+          required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Any relevant security references, CVEs, or documentation
+      placeholder: |
+        - Similar vulnerability: CVE-2023-XXXX
+        - Security guide: https://...
+        - OWASP reference: https://...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: security_contribution
+    attributes:
+      label: Security Contribution
+      description: Would you like to help address this security issue?
+      options:
+        - label: I can help develop a fix for this issue
+        - label: I can help test security patches
+        - label: I can review security documentation updates
+        - label: I can assist with security testing
+
+  - type: textarea
+    id: additional_security_context
+    attributes:
+      label: Additional Security Context
+      description: Any other relevant security information
+      placeholder: |
+        Additional context about the security issue, related security concerns,
+        or other information that might be helpful for the security team.

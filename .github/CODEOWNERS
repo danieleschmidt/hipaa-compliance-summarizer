@@ -1,0 +1,58 @@
+# CODEOWNERS file for HIPAA Compliance Summarizer
+# This file defines who is responsible for reviewing different parts of the codebase
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners - all changes require review from these users
+* @maintainer-team @security-team
+
+# Core Application Code
+/src/ @core-developers @security-team
+/src/hipaa_compliance_summarizer/ @core-developers @security-team
+/src/hipaa_compliance_summarizer/security.py @security-team
+/src/hipaa_compliance_summarizer/phi.py @security-team @hipaa-compliance-team
+/src/hipaa_compliance_summarizer/phi_patterns.py @security-team @hipaa-compliance-team
+
+# CLI and User Interface
+/src/hipaa_compliance_summarizer/cli/ @core-developers @ux-team
+
+# Configuration and Infrastructure  
+/config/ @devops-team @security-team
+/pyproject.toml @core-developers @devops-team
+/requirements.txt @core-developers @security-team
+/Dockerfile* @devops-team @security-team
+/docker-compose*.yml @devops-team @security-team
+/Makefile @devops-team
+
+# CI/CD and Automation
+/.github/ @devops-team @security-team
+/.github/workflows/ @devops-team @security-team
+/.pre-commit-config.yaml @devops-team @security-team
+
+# Testing and Quality Assurance
+/tests/ @qa-team @core-developers
+/tests/security/ @security-team @qa-team
+/tests/compliance/ @hipaa-compliance-team @qa-team
+/tests/performance/ @performance-team @qa-team
+
+# Documentation
+*.md @docs-team
+/docs/ @docs-team
+/docs/security.md @security-team @docs-team
+/docs/hipaa-compliance.md @hipaa-compliance-team @docs-team
+/ARCHITECTURE.md @core-developers @docs-team
+/SECURITY.md @security-team @docs-team
+
+# Security and Compliance
+/SECURITY.md @security-team
+/.secrets.baseline @security-team
+/bandit.yml @security-team
+/.gitignore @security-team @devops-team
+
+# Legal and Compliance
+/LICENSE @legal-team
+/CODE_OF_CONDUCT.md @community-team @legal-team
+/CONTRIBUTING.md @community-team @docs-team
+
+# Default owners for files not covered above
+# Ensures all changes have proper review
+**/* @maintainer-team
