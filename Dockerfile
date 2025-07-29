@@ -1,5 +1,5 @@
 # Multi-stage build for HIPAA Compliance Summarizer
-FROM python:3.11-slim as builder
+FROM python:3.13-slim as builder
 
 # Set environment variables for build
 ENV PYTHONUNBUFFERED=1 \
@@ -41,7 +41,7 @@ RUN safety check --json --output /tmp/safety-report.json || true
 RUN pip-audit --format=json --output=/tmp/pip-audit-report.json || true
 
 # Production stage
-FROM python:3.11-slim as production
+FROM python:3.13-slim as production
 
 # Security: Create non-root user
 RUN groupadd -r hipaa && useradd -r -g hipaa hipaa
@@ -128,7 +128,7 @@ RUN pip install memory-profiler line-profiler
 RUN python -m pytest tests/ -k "performance" --benchmark-only || true
 
 # Documentation stage
-FROM python:3.11-slim as docs
+FROM python:3.13-slim as docs
 
 WORKDIR /app
 
