@@ -1,122 +1,63 @@
-# Advanced GitHub Workflows Documentation
+# GitHub Actions Workflow Templates
 
-This directory contains documentation for advanced GitHub workflows that enhance the SDLC for the HIPAA Compliance Summarizer. These workflows require the `workflows` permission to be implemented.
+This directory contains advanced CI/CD workflow templates that need to be manually copied to `.github/workflows/` directory due to GitHub security restrictions.
 
-## Required Advanced Workflows
+## Workflow Files to Copy
 
-### 1. Performance Monitoring Workflow
+### 1. Advanced CI/CD Pipeline
+**Source**: See `AUTONOMOUS_SDLC_ENHANCEMENTS.md` for complete implementation  
+**Target**: `.github/workflows/advanced-ci.yml`
 
-**File**: `performance-monitoring.yml`  
-**Purpose**: Automated performance benchmarking and regression detection
-
-**Schedule**: Daily at 2 AM UTC  
-**Triggers**: Manual dispatch with configurable thresholds
-
-**Key Features**:
-- Memory and CPU profiling with py-spy and memory-profiler
-- Performance benchmark comparison with baseline
-- Automated PR comments with performance data
-- Healthcare-specific metrics tracking (PHI processing rates)
-- Performance regression alerts with configurable thresholds
-
-### 2. Security Hardening Workflow
-
-**File**: `security-hardening.yml`  
-**Purpose**: Advanced security scanning and supply chain protection
-
-**Schedule**: Weekly on Monday at 6 AM UTC  
-**Triggers**: Push to main, PR with security-relevant changes
-
-**Key Features**:
-- Software Bill of Materials (SBOM) generation with CycloneDX
-- Multi-layered vulnerability scanning (pip-audit, safety, semgrep)
-- Healthcare-specific security patterns for HIPAA compliance
+Features:
+- Multi-stage security scanning (Bandit, Safety, pip-audit, Semgrep)
+- SBOM generation with CycloneDX  
+- Cross-platform testing matrix
+- Performance benchmarking integration
 - Container security scanning with Trivy
-- Supply chain risk assessment and monitoring
+- Automated deployment pipelines
 
-### 3. Automated Dependency Updates Workflow
+### 2. Supply Chain Security
+**Source**: See `AUTONOMOUS_SDLC_ENHANCEMENTS.md` for complete implementation  
+**Target**: `.github/workflows/supply-chain-security.yml`  
 
-**File**: `dependency-update.yml`  
-**Purpose**: Automated dependency management with security focus
+Features:
+- SLSA Level 3 provenance generation
+- Container image signing with Cosign
+- Dependency vulnerability scanning
+- License compliance checking
+- Code signing for releases
 
-**Schedule**: Weekly on Monday at 4 AM UTC  
-**Triggers**: Manual dispatch with update type selection
+## Setup Instructions
 
-**Key Features**:
-- Daily vulnerability scanning with security advisory generation
-- Intelligent update classification (patch/minor/major)
-- Healthcare package prioritization for critical security updates
-- Automated PR creation with comprehensive testing
-- Supply chain security monitoring and analysis
+1. **Copy Workflow Files**:
+   The complete workflow YAML files are documented in the enhancement report.
+   Copy them manually to `.github/workflows/` directory.
 
-## Implementation Instructions
+2. **Configure Repository Secrets**:
+   - `CODECOV_TOKEN`: For coverage reporting
+   - `DOCKER_HUB_USERNAME`: For container registry
+   - `DOCKER_HUB_ACCESS_TOKEN`: For container registry  
+   - `STAGING_DEPLOY_KEY`: For staging deployment
+   - `PRODUCTION_DEPLOY_KEY`: For production deployment
 
-To implement these workflows, a repository administrator with `workflows` permission should:
+3. **Configure Repository Variables**:
+   - `STAGING_URL`: Staging environment URL
+   - `PRODUCTION_URL`: Production environment URL
+   - `MONITORING_DASHBOARD`: Link to monitoring dashboard
 
-1. **Create the workflow files** in `.github/workflows/` directory
-2. **Configure repository secrets** as needed for integrations
-3. **Set up branch protection rules** to require workflow completion
-4. **Configure notification channels** for alerts and security advisories
+4. **Enable Required Permissions**:
+   - Go to Settings > Actions > General
+   - Set "Workflow permissions" to "Read and write permissions"
+   - Enable "Allow GitHub Actions to create and approve pull requests"
 
-## Manual Setup Required
+## Healthcare Compliance Notes
 
-Due to GitHub's workflow permission restrictions, these advanced workflows must be manually created by repository administrators:
+These workflows are specifically designed for healthcare applications with:
+- PHI-safe processing validation
+- HIPAA compliance verification  
+- Healthcare regulation adherence checks
+- Clinical workflow smoke tests
+- Supply chain security for healthcare vendors
 
-### Workflow Configuration Files Needed
-
-1. **`.github/workflows/performance-monitoring.yml`** - Performance benchmarking automation
-2. **`.github/workflows/security-hardening.yml`** - Advanced security scanning  
-3. **`.github/workflows/dependency-update.yml`** - Automated dependency management
-
-### Repository Configuration
-
-**Branch Protection Rules**:
-- Require status checks for security workflows
-- Require up-to-date branches before merging
-- Require conversation resolution before merging
-
-**Required Permissions**:
-- `workflows: write` - To create/modify workflow files
-- `security-events: write` - For security findings
-- `contents: write` - For PR creation
-- `pull-requests: write` - For PR management
-
-### Integration Requirements
-
-**External Tools**:
-- Trivy for container scanning
-- Semgrep for static analysis
-- CycloneDX for SBOM generation
-- py-spy for CPU profiling
-- memory-profiler for memory analysis
-
-**Monitoring Stack**:
-- Prometheus for metrics collection
-- Grafana for dashboards and visualization
-- AlertManager for notification routing
-
-## Workflow Specifications
-
-The complete workflow specifications are documented in the SDLC Enhancement Summary. Each workflow includes:
-
-- Comprehensive job definitions with security scanning
-- Healthcare-specific compliance validation
-- Performance benchmarking with regression detection
-- Automated PR creation and review processes
-- Security advisory generation for vulnerabilities
-
-## Compliance Integration
-
-### HIPAA Requirements
-- Audit logging for all workflow executions
-- Secure handling of vulnerability data
-- No PHI data in workflow outputs
-- Access control validation
-
-### SOC 2 Controls
-- Principle of least privilege for permissions
-- Continuous monitoring of workflow execution
-- Regular audit of workflow configurations
-- Multi-factor authentication for modifications
-
-For detailed implementation examples and complete workflow code, see the `docs/SDLC_ENHANCEMENT_SUMMARY.md` file.
+**IMPORTANT**: Review all workflow configurations for your specific healthcare compliance requirements before enabling in production.
+EOF < /dev/null

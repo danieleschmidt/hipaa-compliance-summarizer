@@ -1,0 +1,252 @@
+# HIPAA Compliance Monitoring Alerts
+# Healthcare-specific alerting rules with PHI-safe notifications
+
+groups:
+  - name: hipaa-compliance
+    interval: 30s
+    rules:
+      # PHI Detection and Processing Alerts
+      - alert: PHIDetectionFailureRate
+        expr: |
+          (
+            rate(phi_detection_errors_total[5m]) / 
+            rate(phi_detection_attempts_total[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          category: hipaa_compliance
+          impact: high
+        annotations:
+          summary: "High PHI detection failure rate detected"
+          description: "PHI detection failure rate is {{ $value | humanizePercentage }} over the last 5 minutes, exceeding the 5% threshold"
+          runbook_url: "https://docs.example.com/runbooks/phi-detection-failures"
+          compliance_impact: "HIPAA violation risk - potential PHI exposure"
+
+      - alert: DocumentProcessingStalled
+        expr: |
+          increase(documents_processed_total[10m]) == 0 and 
+          documents_queued > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+          impact: medium
+        annotations:
+          summary: "Document processing has stalled"
+          description: "No documents processed in 10 minutes despite {{ $value }} documents in queue"
+          runbook_url: "https://docs.example.com/runbooks/processing-stalled"
+
+      # Security and Access Control Alerts
+      - alert: UnauthorizedAccessAttempt
+        expr: |
+          increase(http_requests_total{status=~"401|403"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+          impact: high
+        annotations:
+          summary: "Multiple unauthorized access attempts detected"
+          description: "{{ $value }} unauthorized access attempts in the last 5 minutes"
+          runbook_url: "https://docs.example.com/runbooks/security-incidents"
+          immediate_action: "Review access logs and consider IP blocking"
+
+      - alert: SuspiciousDataAccess
+        expr: |
+          rate(data_access_events_total{sensitive="true"}[5m]) > 
+          avg_over_time(rate(data_access_events_total{sensitive="true"}[5m])[1h:5m]) * 3
+        for: 3m
+        labels:
+          severity: critical
+          category: security
+          impact: high
+        annotations:
+          summary: "Suspicious pattern in sensitive data access"
+          description: "Sensitive data access rate is {{ $value | humanize }} requests/sec, 3x higher than normal"
+          runbook_url: "https://docs.example.com/runbooks/data-access-anomaly"
+          compliance_impact: "Potential HIPAA breach - immediate investigation required"
+
+      # Performance and Availability Alerts
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job="hipaa-summarizer"}[5m])
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+          impact: medium
+        annotations:
+          summary: "High response latency detected"
+          description: "95th percentile latency is {{ $value }}s, exceeding 5s threshold"
+          runbook_url: "https://docs.example.com/runbooks/high-latency"
+
+      - alert: ServiceDown
+        expr: up{job="hipaa-summarizer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+          impact: high
+        annotations:
+          summary: "HIPAA Summarizer service is down"
+          description: "Service has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/service-down"
+          immediate_action: "Execute service recovery procedures"
+
+      # Compliance-Specific Alerts
+      - alert: ComplianceScoreDrop
+        expr: |
+          avg_over_time(compliance_score[5m]) < 0.95
+        for: 10m
+        labels:
+          severity: warning
+          category: hipaa_compliance
+          impact: high
+        annotations:
+          summary: "Compliance score below acceptable threshold"
+          description: "Average compliance score is {{ $value | humanizePercentage }}, below 95% threshold"
+          runbook_url: "https://docs.example.com/runbooks/compliance-degradation"
+          compliance_impact: "Risk of HIPAA non-compliance"
+
+      - alert: AuditLogGap
+        expr: |
+          increase(audit_events_total[5m]) == 0 and 
+          increase(http_requests_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: hipaa_compliance
+          impact: high
+        annotations:
+          summary: "Audit logging appears to have stopped"
+          description: "No audit events recorded despite ongoing requests"
+          runbook_url: "https://docs.example.com/runbooks/audit-failure"
+          compliance_impact: "HIPAA violation - audit trail incomplete"
+
+      # Resource and Infrastructure Alerts
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{name="hipaa-summarizer"} / 
+            container_spec_memory_limit_bytes{name="hipaa-summarizer"}
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+          impact: medium
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} of limit"
+          runbook_url: "https://docs.example.com/runbooks/high-memory"
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"} / 
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          category: resources
+          impact: high
+        annotations:
+          summary: "Critical disk space shortage"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          runbook_url: "https://docs.example.com/runbooks/disk-cleanup"
+          immediate_action: "Clean up logs and temporary files"
+
+      # Data Quality and Processing Alerts
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{status=~"5.."}[5m]) / 
+            rate(http_requests_total[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: reliability
+          impact: medium
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }}, exceeding 5% threshold"
+          runbook_url: "https://docs.example.com/runbooks/high-errors"
+
+      - alert: ProcessingBacklog
+        expr: documents_queued > 1000
+        for: 15m
+        labels:
+          severity: warning
+          category: performance
+          impact: medium
+        annotations:
+          summary: "Large document processing backlog"
+          description: "{{ $value }} documents queued for processing"
+          runbook_url: "https://docs.example.com/runbooks/processing-backlog"
+
+  - name: hipaa-security
+    interval: 15s
+    rules:
+      # Real-time security monitoring
+      - alert: RateLimitExceeded
+        expr: |
+          rate(rate_limit_exceeded_total[1m]) > 0
+        for: 30s
+        labels:
+          severity: warning
+          category: security
+          impact: low
+        annotations:
+          summary: "Rate limiting triggered for client"
+          description: "Rate limit exceeded {{ $value }} times per second"
+          runbook_url: "https://docs.example.com/runbooks/rate-limiting"
+
+      - alert: CertificateExpiring
+        expr: |
+          (ssl_certificate_expiry_timestamp - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          category: security
+          impact: medium
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "Certificate expires in {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.example.com/runbooks/certificate-renewal"
+
+  - name: hipaa-data-quality
+    interval: 60s
+    rules:
+      # Data quality monitoring
+      - alert: PHIRedactionIncomplete
+        expr: |
+          rate(phi_redaction_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: hipaa_compliance
+          impact: high
+        annotations:
+          summary: "PHI redaction failures detected"
+          description: "{{ $value }} PHI redaction failures per second"
+          runbook_url: "https://docs.example.com/runbooks/redaction-failures"
+          compliance_impact: "Immediate HIPAA violation risk"
+          immediate_action: "Halt processing and investigate"
+
+      - alert: DataIntegrityCheck
+        expr: |
+          rate(data_integrity_failures_total[10m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: data_quality
+          impact: high
+        annotations:
+          summary: "Data integrity check failures"
+          description: "{{ $value }} data integrity failures detected"
+          runbook_url: "https://docs.example.com/runbooks/data-integrity"
