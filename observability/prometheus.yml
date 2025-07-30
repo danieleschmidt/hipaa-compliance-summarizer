@@ -1,0 +1,124 @@
+# Prometheus Configuration for HIPAA Compliance Summarizer
+# Healthcare-grade monitoring with PHI-safe metrics collection
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: '{{ .Environment }}'
+    service: 'hipaa-compliance-summarizer'
+    region: '{{ .Region }}'
+
+# Alertmanager configuration  
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  # Application metrics
+  - job_name: 'hipaa-summarizer'
+    static_configs:
+      - targets: ['hipaa-app:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    scheme: https
+    tls_config:
+      # Healthcare requires encrypted metrics
+      insecure_skip_verify: false
+      cert_file: /etc/prometheus/certs/client.crt
+      key_file: /etc/prometheus/certs/client.key
+      ca_file: /etc/prometheus/certs/ca.crt
+    relabel_configs:
+      # Ensure no PHI in metric labels
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(:[0-9]+)?'
+        replacement: '${1}'
+
+  # System metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Database metrics (if applicable)
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    params:
+      # Ensure database queries don't expose PHI
+      'anonymize': ['true']
+
+  # Redis metrics (for caching)
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      # Remove potentially sensitive container labels
+      - source_labels: [container_label_com_docker_compose_config_hash]
+        target_label: __tmp_drop
+      - source_labels: [__tmp_drop]
+        regex: '.+'
+        action: drop
+
+  # Load balancer metrics
+  - job_name: 'nginx-exporter'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+
+  # Kubernetes metrics (if running on K8s)
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Healthcare-specific metrics
+  - job_name: 'hipaa-compliance-metrics'
+    static_configs:
+      - targets: ['hipaa-app:8000']
+    metrics_path: /compliance/metrics
+    scrape_interval: 30s
+    # Custom headers for compliance metrics
+    headers:
+      'X-Compliance-Level': 'HIPAA'
+      'X-Audit-Required': 'true'
+
+# Remote write for long-term storage (optional)
+remote_write:
+  - url: "https://prometheus-remote-write.example.com/api/v1/write"
+    basic_auth:
+      username: prometheus
+      password_file: /etc/prometheus/secrets/remote_write_password
+    tls_config:
+      cert_file: /etc/prometheus/certs/remote_write.crt
+      key_file: /etc/prometheus/certs/remote_write.key
+    write_relabel_configs:
+      # Ensure no sensitive metrics are sent remotely
+      - source_labels: [__name__]
+        regex: '.*_phi_.*|.*_patient_.*|.*_sensitive_.*'
+        action: drop
+
+# Remote read for historical data
+remote_read:
+  - url: "https://prometheus-remote-read.example.com/api/v1/read"
+    basic_auth:
+      username: prometheus
+      password_file: /etc/prometheus/secrets/remote_read_password
