@@ -131,4 +131,3 @@
   "security.workspace.trust.banner": "always",
   "security.workspace.trust.emptyWindow": false
 }
-EOF < /dev/null
