@@ -1,0 +1,426 @@
+name: 🏥 HIPAA CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  PYTHON_VERSION: 3.11
+  COVERAGE_THRESHOLD: 80
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Pre-flight security and compliance checks
+  security-preflight:
+    name: 🔒 Security Pre-flight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install security tools
+        run: |
+          pip install bandit safety pip-audit detect-secrets
+
+      - name: Run detect-secrets scan
+        run: |
+          detect-secrets scan --baseline .secrets.baseline --all-files
+          if [ $? -ne 0 ]; then
+            echo "❌ Potential secrets detected!"
+            exit 1
+          fi
+
+      - name: Validate HIPAA compliance markers
+        run: |
+          # Check for HIPAA compliance markers in code
+          if grep -r "PHI" src/ --include="*.py" | grep -v "# HIPAA-SAFE" | grep -v "# NO-PHI"; then
+            echo "❌ Found potential PHI handling without HIPAA markers!"
+            exit 1
+          fi
+
+  # Code quality and linting
+  code-quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    needs: security-preflight
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ruff mypy bandit isort black
+          pip install -r requirements.txt
+
+      - name: Lint with Ruff
+        run: |
+          echo "🔍 Running Ruff linter..."
+          ruff check src/ tests/ --format=github
+
+      - name: Format check with Ruff
+        run: |
+          echo "🎨 Checking code formatting..."
+          ruff format --check src/ tests/
+
+      - name: Type checking with MyPy
+        run: |
+          echo "🏷️ Running type checking..."
+          mypy src/ --ignore-missing-imports --check-untyped-defs
+
+      - name: Import sorting check
+        run: |
+          echo "📦 Checking import sorting..."
+          isort --check-only --diff src/ tests/
+
+      - name: Security linting with Bandit
+        run: |
+          echo "🛡️ Running security linting..."
+          bandit -r src/ -f json -o bandit-report.json
+          bandit -r src/ -f text
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: bandit-report.json
+
+  # Comprehensive testing matrix
+  test:
+    name: 🧪 Test Suite
+    runs-on: ${{ matrix.os }}
+    needs: code-quality
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        include:
+          # Test with minimal dependencies
+          - os: ubuntu-latest
+            python-version: "3.9"
+            minimal-deps: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          if [ "${{ matrix.minimal-deps }}" == "true" ]; then
+            pip install -r requirements-minimal.txt || pip install -r requirements.txt
+          else
+            pip install -r requirements.txt
+          fi
+          pip install -r requirements-test.txt
+          pip install -e .
+
+      - name: 🔒 HIPAA Compliance Tests
+        run: |
+          echo "🏥 Running HIPAA compliance tests..."
+          pytest tests/ -m "hipaa" -v \
+            --junitxml=junit/hipaa-compliance-${{ matrix.python-version }}.xml
+
+      - name: 🧪 Unit Tests
+        run: |
+          echo "🔬 Running unit tests..."
+          pytest tests/ -m "not integration and not performance" -v \
+            --cov=hipaa_compliance_summarizer \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+            --junitxml=junit/unit-tests-${{ matrix.python-version }}.xml
+
+      - name: 🔗 Integration Tests
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "🔗 Running integration tests..."
+          pytest tests/ -m "integration" -v \
+            --junitxml=junit/integration-tests-${{ matrix.python-version }}.xml
+
+      - name: ⚡ Performance Tests
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        run: |
+          echo "⚡ Running performance benchmarks..."
+          pytest tests/ -m "performance" -v \
+            --benchmark-json=benchmark-results.json \
+            --junitxml=junit/performance-tests.xml
+
+      - name: 🛡️ Security Tests
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "🛡️ Running security tests..."
+          pytest tests/ -m "security" -v \
+            --junitxml=junit/security-tests-${{ matrix.python-version }}.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: |
+            junit/
+            coverage.xml
+            benchmark-results.json
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+
+  # Advanced security scanning
+  security-scan:
+    name: 🛡️ Security Analysis
+    runs-on: ubuntu-latest
+    needs: code-quality
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install security tools
+        run: |
+          pip install safety pip-audit semgrep
+
+      - name: Safety vulnerability scan
+        run: |
+          echo "🔍 Scanning for known vulnerabilities..."
+          safety check --json --output safety-report.json || true
+          safety check
+
+      - name: Dependency audit with pip-audit
+        run: |
+          echo "📦 Auditing dependencies..."
+          pip-audit --format=json --output=pip-audit-report.json
+          pip-audit
+
+      - name: Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/python
+          generate-sarif-file: true
+          sarif-file: semgrep-results.sarif
+
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-analysis
+          path: |
+            safety-report.json
+            pip-audit-report.json
+            semgrep-results.sarif
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+
+  # Container build and security
+  container-build:
+    name: 🐳 Container Build & Scan
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+
+  # SLSA provenance generation
+  provenance:
+    name: 📜 Generate Provenance
+    needs: [container-build]
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.9.0
+    with:
+      image: ${{ needs.container-build.outputs.image-digest }}
+      digest: ${{ needs.container-build.outputs.image-digest }}
+    secrets:
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  # Deployment readiness check
+  deployment-readiness:
+    name: 🚀 Deployment Readiness
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, container-build]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify all checks passed
+        run: |
+          echo "✅ All CI checks completed successfully!"
+          echo "🔒 Security scans: PASSED"
+          echo "🧪 Tests: PASSED"
+          echo "🐳 Container build: PASSED"
+          echo "🚀 Ready for deployment"
+
+      - name: Create deployment artifact
+        run: |
+          mkdir -p deployment-artifacts
+          echo "${{ github.sha }}" > deployment-artifacts/git-sha.txt
+          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" > deployment-artifacts/image-ref.txt
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > deployment-artifacts/build-timestamp.txt
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: deployment-artifacts/
+
+  # Notification and summary
+  notify:
+    name: 📢 Notify Results
+    runs-on: ubuntu-latest
+    needs: [security-preflight, code-quality, test, security-scan, container-build]
+    if: always()
+    steps:
+      - name: Determine overall status
+        id: status
+        run: |
+          if [[ "${{ needs.security-preflight.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=🚨 Security pre-flight checks failed!" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Code quality checks failed!" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=🧪 Tests failed!" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.security-scan.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=🛡️ Security scans failed!" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.container-build.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=🐳 Container build failed!" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ All checks passed! Ready for deployment." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create job summary
+        run: |
+          echo "## 🏥 HIPAA CI/CD Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security Pre-flight: ${{ needs.security-preflight.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 Test Suite: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🛡️ Security Analysis: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐳 Container Build: ${{ needs.container-build.result }}" >> $GITHUB_STEP_SUMMARY

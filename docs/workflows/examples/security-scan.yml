@@ -1,0 +1,472 @@
+name: 🛡️ Security & Compliance Scan
+
+on:
+  schedule:
+    # Run comprehensive security scans daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  push:
+    branches: [ main ]
+    paths:
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - 'src/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      scan_level:
+        description: 'Security scan level'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+        - standard
+        - comprehensive
+        - critical-only
+
+env:
+  PYTHON_VERSION: 3.11
+
+jobs:
+  # Secrets and credential scanning
+  secret-scan:
+    name: 🔐 Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Run detect-secrets
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --all-files --baseline .secrets.baseline
+          if [ $? -ne 0 ]; then
+            echo "🚨 New secrets detected!"
+            detect-secrets scan --all-files
+            exit 1
+          fi
+
+      - name: GitLeaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+
+  # Static code analysis for security vulnerabilities
+  static-analysis:
+    name: 🔍 Static Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit semgrep
+
+      - name: Bandit security scan
+        run: |
+          echo "🛡️ Running Bandit security analysis..."
+          bandit -r src/ -f json -o bandit-report.json
+          bandit -r src/ -ll -i
+
+      - name: Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/python
+            p/owasp-top-ten
+            p/cwe-top-25
+          generate-sarif-file: true
+          sarif-file: semgrep-results.sarif
+
+      - name: CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:python"
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static-analysis-reports
+          path: |
+            bandit-report.json
+            semgrep-results.sarif
+
+  # Dependency vulnerability scanning
+  dependency-scan:
+    name: 📦 Dependency Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install scanning tools
+        run: |
+          pip install --upgrade pip
+          pip install safety pip-audit cyclonedx-bom
+
+      - name: Safety vulnerability scan
+        run: |
+          echo "🔍 Scanning for known vulnerabilities with Safety..."
+          safety check --json --output safety-report.json
+          safety check --short-report
+
+      - name: pip-audit scan
+        run: |
+          echo "📋 Running pip-audit..."
+          pip-audit --format=json --output=pip-audit-report.json
+          pip-audit --desc
+
+      - name: Snyk vulnerability scan
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --json-file-output=snyk-report.json
+
+      - name: Generate SBOM
+        run: |
+          echo "📋 Generating Software Bill of Materials..."
+          pip install cyclonedx-bom
+          cyclonedx-py requirements -r requirements.txt -o sbom.json
+          cyclonedx-py requirements -r requirements.txt -o sbom.xml
+
+      - name: Upload dependency reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-reports
+          path: |
+            safety-report.json
+            pip-audit-report.json
+            snyk-report.json
+            sbom.json
+            sbom.xml
+
+  # License compliance scanning
+  license-scan:
+    name: ⚖️ License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install license scanning tools
+        run: |
+          pip install --upgrade pip
+          pip install pip-licenses licensecheck
+
+      - name: Generate license report
+        run: |
+          echo "⚖️ Generating license compliance report..."
+          pip install -r requirements.txt
+          pip-licenses --format=json --output-file=licenses.json
+          pip-licenses --format=csv --output-file=licenses.csv
+          pip-licenses
+
+      - name: Check for incompatible licenses
+        run: |
+          echo "🔍 Checking for incompatible licenses..."
+          # Define prohibited licenses for healthcare applications
+          PROHIBITED_LICENSES=("GPL-3.0" "AGPL-3.0" "SSPL-1.0")
+          
+          for license in "${PROHIBITED_LICENSES[@]}"; do
+            if grep -i "$license" licenses.json; then
+              echo "❌ Prohibited license found: $license"
+              exit 1
+            fi
+          done
+          echo "✅ No prohibited licenses found"
+
+      - name: Upload license reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: |
+            licenses.json
+            licenses.csv
+
+  # Container security scanning
+  container-security:
+    name: 🐳 Container Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t hipaa-summarizer:scan .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: hipaa-summarizer:scan
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config-results.sarif
+
+      - name: Docker Scout scan
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: hipaa-summarizer:scan
+          format: sarif
+          output: scout-results.sarif
+
+      - name: Upload container security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-security-reports
+          path: |
+            trivy-results.sarif
+            trivy-config-results.sarif
+            scout-results.sarif
+
+      - name: Upload SARIF files
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: |
+            trivy-results.sarif
+            trivy-config-results.sarif
+
+  # HIPAA compliance validation
+  hipaa-compliance:
+    name: 🏥 HIPAA Compliance Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: HIPAA PHI detection validation
+        run: |
+          echo "🏥 Validating PHI detection capabilities..."
+          python -c "
+          from hipaa_compliance_summarizer.phi import PHIDetector
+          detector = PHIDetector()
+          
+          # Test with synthetic PHI data
+          test_text = 'Patient: John TestCase, DOB: 01/01/1900, SSN: 999-99-9999'
+          result = detector.detect_phi(test_text)
+          
+          if len(result['entities']) < 3:
+              print('❌ PHI detection not working properly')
+              exit(1)
+          else:
+              print('✅ PHI detection working correctly')
+          "
+
+      - name: Audit trail validation
+        run: |
+          echo "📋 Validating audit trail functionality..."
+          python -c "
+          import tempfile
+          import json
+          from hipaa_compliance_summarizer.security import AuditLogger
+          
+          with tempfile.NamedTemporaryFile(mode='w+', delete=False) as f:
+              logger = AuditLogger(f.name)
+              logger.log_event('test_event', {'test': 'data'})
+              
+              # Read back the log
+              f.seek(0)
+              log_data = f.read()
+              if 'test_event' not in log_data:
+                  print('❌ Audit logging not working')
+                  exit(1)
+              else:
+                  print('✅ Audit logging working correctly')
+          "
+
+      - name: Compliance score validation
+        run: |
+          echo "📊 Validating compliance scoring..."
+          python -c "
+          from hipaa_compliance_summarizer.reporting import ComplianceReporter
+          reporter = ComplianceReporter()
+          
+          # Generate a test compliance report
+          report = reporter.generate_report(
+              period='test',
+              documents_processed=10,
+              include_recommendations=True
+          )
+          
+          if report.overall_compliance < 0.9:
+              print('❌ Compliance score below threshold')
+              exit(1)
+          else:
+              print('✅ Compliance scoring working correctly')
+          "
+
+  # Infrastructure security scanning
+  infrastructure-scan:
+    name: 🏗️ Infrastructure Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Terraform security scan
+        if: hashFiles('*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          additional_args: --format sarif --out tfsec-results.sarif
+
+      - name: Kubernetes security scan
+        if: hashFiles('k8s/**/*.yaml') != ''
+        run: |
+          echo "🔍 Scanning Kubernetes manifests..."
+          docker run --rm -v $(pwd):/path \
+            aquasec/trivy config /path/k8s \
+            --format sarif --output /path/k8s-security-results.sarif
+
+      - name: Docker Compose security scan
+        if: hashFiles('docker-compose*.yml') != ''
+        run: |
+          echo "🔍 Scanning Docker Compose files..."
+          docker run --rm -v $(pwd):/path \
+            aquasec/trivy config /path \
+            --format sarif --output /path/compose-security-results.sarif
+
+      - name: Upload infrastructure reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: infrastructure-security-reports
+          path: |
+            tfsec-results.sarif
+            k8s-security-results.sarif
+            compose-security-results.sarif
+
+  # Security report aggregation
+  security-summary:
+    name: 📊 Security Summary
+    runs-on: ubuntu-latest
+    needs: [secret-scan, static-analysis, dependency-scan, license-scan, container-security, hipaa-compliance]
+    if: always()
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          path: security-reports
+
+      - name: Generate security summary
+        run: |
+          echo "# 🛡️ Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "## Scan Results" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "- 🔐 Secret Detection: ${{ needs.secret-scan.result }}" >> security-summary.md
+          echo "- 🔍 Static Analysis: ${{ needs.static-analysis.result }}" >> security-summary.md
+          echo "- 📦 Dependency Scan: ${{ needs.dependency-scan.result }}" >> security-summary.md
+          echo "- ⚖️ License Compliance: ${{ needs.license-scan.result }}" >> security-summary.md
+          echo "- 🐳 Container Security: ${{ needs.container-security.result }}" >> security-summary.md
+          echo "- 🏥 HIPAA Compliance: ${{ needs.hipaa-compliance.result }}" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Count findings
+          CRITICAL_FINDINGS=0
+          HIGH_FINDINGS=0
+          MEDIUM_FINDINGS=0
+          
+          if find security-reports -name "*.json" -exec grep -l "critical\|CRITICAL" {} \; | wc -l | xargs test 0 -lt; then
+            CRITICAL_FINDINGS=$(find security-reports -name "*.json" -exec grep -o "critical\|CRITICAL" {} \; | wc -l)
+          fi
+          
+          echo "## Findings Summary" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "- 🚨 Critical: $CRITICAL_FINDINGS" >> security-summary.md
+          echo "- ⚠️ High: $HIGH_FINDINGS" >> security-summary.md
+          echo "- ⚡ Medium: $MEDIUM_FINDINGS" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          if [ $CRITICAL_FINDINGS -gt 0 ]; then
+            echo "❌ **Action Required**: Critical security findings detected!" >> security-summary.md
+          else
+            echo "✅ **Status**: No critical security issues found" >> security-summary.md
+          fi
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+
+      - name: Create job summary
+        run: |
+          cat security-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail on critical findings
+        run: |
+          if find security-reports -name "*.json" -exec grep -l "critical\|CRITICAL" {} \; | wc -l | xargs test 0 -lt; then
+            echo "🚨 Critical security findings detected!"
+            exit 1
+          fi
