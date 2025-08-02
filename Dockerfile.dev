@@ -1,5 +1,5 @@
 # HIPAA Compliance Summarizer - Development Dockerfile
-FROM mcr.microsoft.com/devcontainers/python:1-3.11-bullseye
+FROM mcr.microsoft.com/devcontainers/python:3.13-bullseye
 
 # Set environment variables for development
 ENV PYTHONDONTWRITEBYTECODE=1 \
