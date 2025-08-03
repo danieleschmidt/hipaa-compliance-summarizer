@@ -47,29 +47,40 @@ graph TB
 ## Data Flow
 
 1. **Input Processing**
-   - Document ingestion and validation
-   - Format detection and conversion
-   - Initial security scanning
+   - Document ingestion and validation (PDF, TXT, DOCX, HL7 FHIR)
+   - Format detection and conversion using parsers
+   - Initial security scanning and virus detection
+   - Metadata extraction and document classification
 
 2. **PHI Analysis**
-   - Pattern-based detection using regex and NLP models
-   - Confidence scoring for identified PHI entities
-   - Context-aware classification
+   - Pattern-based detection using enhanced regex patterns
+   - ML model inference with BioBERT/ClinicalBERT
+   - Confidence scoring for identified PHI entities (0.0-1.0)
+   - Context-aware classification with clinical understanding
+   - Cache-optimized pattern matching for performance
 
 3. **Redaction Processing**
-   - Configurable redaction strategies (masking, removal, tokenization)
-   - Clinical context preservation
-   - Structure maintenance
+   - Configurable redaction strategies:
+     - Complete removal for high-risk PHI
+     - Masking with asterisks for moderate-risk data
+     - Synthetic replacement with realistic alternatives
+     - Tokenization for reversible access control
+   - Clinical context preservation algorithms
+   - Document structure maintenance with layout preservation
 
 4. **Compliance Validation**
-   - HIPAA rule validation
-   - Risk assessment scoring
-   - Audit trail generation
+   - HIPAA Safe Harbor rule validation (18 identifier categories)
+   - Risk assessment scoring based on PHI exposure
+   - Compliance policy enforcement engine
+   - Audit trail generation with timestamp tracking
+   - Violation detection and alert system
 
 5. **Output Generation**
-   - Summary report creation
-   - Compliance metrics calculation
-   - Secure storage or transmission
+   - Summary report creation with clinical context
+   - Compliance metrics calculation and scoring
+   - Redacted document generation with watermarks
+   - Audit logs in structured JSON format
+   - Secure storage with encryption at rest
 
 ## Technology Stack
 

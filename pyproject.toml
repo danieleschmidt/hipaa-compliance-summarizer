@@ -12,6 +12,9 @@ package-dir = {"" = "src"}
 packages = [
     "hipaa_compliance_summarizer",
     "hipaa_compliance_summarizer.cli",
+    "hipaa_compliance_summarizer.config",
+    "hipaa_compliance_summarizer.models",
+    "hipaa_compliance_summarizer.services",
 ]
 
 [project.scripts]

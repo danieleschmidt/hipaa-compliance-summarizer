@@ -67,7 +67,7 @@ USER hipaa
 
 # Copy application from builder stage
 COPY --from=builder --chown=hipaa:hipaa /app ./
-COPY --from=builder --chown=hipaa:hipaa /usr/local/lib/python3.11/site-packages /home/hipaa/.local/lib/python3.11/site-packages
+COPY --from=builder --chown=hipaa:hipaa /usr/local/lib/python3.13/site-packages /home/hipaa/.local/lib/python3.13/site-packages
 COPY --from=builder --chown=hipaa:hipaa /usr/local/bin /home/hipaa/.local/bin
 
 # Copy security scan reports
