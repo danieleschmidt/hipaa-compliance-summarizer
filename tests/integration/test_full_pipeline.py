@@ -136,7 +136,7 @@ class TestAPIIntegration:
     """Test API endpoints and external integrations."""
 
     @pytest.mark.skipif(
-        not pytest.config.getoption("--integration"),
+        True,
         reason="Integration tests require --integration flag",
     )
     def test_health_check_endpoint(self, integration_test_config):

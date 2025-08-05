@@ -1,0 +1,351 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-compliance-api
+  namespace: hipaa-system
+  labels:
+    app: hipaa-compliance
+    component: api
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hipaa-compliance
+      component: api
+  template:
+    metadata:
+      labels:
+        app: hipaa-compliance
+        component: api
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: hipaa-compliance-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: hipaa-api
+        image: hipaa-compliance:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: HIPAA_CONFIG_PATH
+          value: "/app/config/hipaa_config.yml"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: WORKERS
+          value: "4"
+        - name: MAX_WORKERS
+          value: "10"
+        - name: ENABLE_AUTO_SCALING
+          value: "true"
+        - name: ENABLE_PERFORMANCE_MONITORING
+          value: "true"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: redis-url
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: jwt-secret
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: data-volume
+          mountPath: /app/data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: hipaa-config
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: hipaa-data-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-compliance-worker
+  namespace: hipaa-system
+  labels:
+    app: hipaa-compliance
+    component: worker
+    version: v1.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: hipaa-compliance
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: hipaa-compliance
+        component: worker
+        version: v1.0.0
+    spec:
+      serviceAccountName: hipaa-compliance-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: hipaa-worker
+        image: hipaa-compliance:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "hipaa_compliance_summarizer.workers.document_processor_worker"]
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: HIPAA_CONFIG_PATH
+          value: "/app/config/hipaa_config.yml"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: WORKER_CONCURRENCY
+          value: "4"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: redis-url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: data-volume
+          mountPath: /app/data
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: hipaa-config
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: hipaa-data-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hipaa-compliance-api-service
+  namespace: hipaa-system
+  labels:
+    app: hipaa-compliance
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: hipaa-compliance
+    component: api
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hipaa-config
+  namespace: hipaa-system
+data:
+  hipaa_config.yml: |
+    compliance:
+      level: "strict"
+      audit_logging: true
+      encryption_at_rest: true
+      phi_detection_threshold: 0.95
+    
+    redaction:
+      method: "synthetic_replacement"
+      preserve_clinical_context: true
+      maintain_document_structure: true
+    
+    models:
+      phi_detector: "microsoft/presidio-analyzer"
+      clinical_summarizer: "microsoft/BioGPT-Large"
+      compliance_checker: "custom_hipaa_model_v2"
+    
+    security:
+      encryption_key_rotation: 90
+      access_logging: true
+      data_retention_policy: 2555
+      secure_deletion: true
+    
+    output:
+      include_confidence_scores: true
+      generate_audit_trail: true
+      compliance_score: true
+      redaction_summary: true
+    
+    performance:
+      enable_caching: true
+      cache_size_mb: 256
+      enable_auto_scaling: true
+      max_workers: 10
+      enable_monitoring: true
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hipaa-data-pvc
+  namespace: hipaa-system
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hipaa-compliance-sa
+  namespace: hipaa-system
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hipaa-compliance-ingress
+  namespace: hipaa-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - hipaa-api.yourdomain.com
+    secretName: hipaa-tls-secret
+  rules:
+  - host: hipaa-api.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hipaa-compliance-api-service
+            port:
+              number: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hipaa-compliance-api-hpa
+  namespace: hipaa-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hipaa-compliance-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
