@@ -14,6 +14,31 @@ from .security import (
     sanitize_filename,
     get_security_recommendations,
 )
+from .error_handling import (
+    HIPAAError,
+    ValidationError,
+    ProcessingError,
+    ComplianceError,
+    ErrorHandler,
+    handle_errors,
+)
+from .resilience import (
+    ResilientExecutor,
+    RetryConfig,
+    resilient_operation,
+)
+from .performance import (
+    PerformanceOptimizer,
+    ConcurrentProcessor,
+    AdaptiveCache,
+    performance_monitor,
+)
+from .scaling import (
+    AutoScaler,
+    WorkerPool,
+    initialize_scaling_infrastructure,
+    get_scaling_status,
+)
 
 __all__ = [
     "PHIRedactor",
@@ -36,4 +61,21 @@ __all__ = [
     "validate_file_for_processing",
     "sanitize_filename",
     "get_security_recommendations",
+    "HIPAAError",
+    "ValidationError", 
+    "ProcessingError",
+    "ComplianceError",
+    "ErrorHandler",
+    "handle_errors",
+    "ResilientExecutor",
+    "RetryConfig", 
+    "resilient_operation",
+    "PerformanceOptimizer",
+    "ConcurrentProcessor",
+    "AdaptiveCache",
+    "performance_monitor",
+    "AutoScaler",
+    "WorkerPool",
+    "initialize_scaling_infrastructure",
+    "get_scaling_status",
 ]
