@@ -1,0 +1,372 @@
+version: '3.8'
+
+services:
+  hipaa-api-gateway:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: hipaa-compliance-system:latest
+    container_name: hipaa-api-gateway
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HIPAA_CONFIG_PATH=/app/config/production.yml
+      - SECURITY_MONITORING_ENABLED=true
+      - ADVANCED_MONITORING_ENABLED=true
+      - ERROR_HANDLING_ENABLED=true
+      - API_GATEWAY_HOST=0.0.0.0
+      - API_GATEWAY_PORT=8000
+      - WORKERS=4
+      - MAX_CONCURRENT_TASKS=50
+      - RATE_LIMIT_REQUESTS=1000
+      - RATE_LIMIT_WINDOW_MINUTES=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # For container orchestration
+    networks:
+      - hipaa-network
+    depends_on:
+      - hipaa-redis
+      - hipaa-postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  hipaa-worker-1:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: hipaa-compliance-system:latest
+    container_name: hipaa-worker-1
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HIPAA_CONFIG_PATH=/app/config/production.yml
+      - WORKER_TYPE=document_processor
+      - WORKER_ID=worker-1
+      - MAX_CONCURRENT_TASKS=10
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - hipaa-network
+    depends_on:
+      - hipaa-redis
+      - hipaa-postgres
+    command: ["python", "-m", "hipaa_compliance_summarizer.workers.document_processor_worker"]
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+
+  hipaa-worker-2:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: hipaa-compliance-system:latest
+    container_name: hipaa-worker-2
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HIPAA_CONFIG_PATH=/app/config/production.yml
+      - WORKER_TYPE=compliance_worker
+      - WORKER_ID=worker-2
+      - MAX_CONCURRENT_TASKS=10
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - hipaa-network
+    depends_on:
+      - hipaa-redis
+      - hipaa-postgres
+    command: ["python", "-m", "hipaa_compliance_summarizer.workers.compliance_worker"]
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+
+  hipaa-redis:
+    image: redis:7-alpine
+    container_name: hipaa-redis
+    restart: unless-stopped
+    environment:
+      - REDIS_PASSWORD=hipaa_redis_production_password_2024
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - hipaa-network
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  hipaa-postgres:
+    image: postgres:15-alpine
+    container_name: hipaa-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=hipaa_compliance
+      - POSTGRES_USER=hipaa_user
+      - POSTGRES_PASSWORD=hipaa_postgres_production_password_2024
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - hipaa-network
+    ports:
+      - "127.0.0.1:5432:5432"
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hipaa_user -d hipaa_compliance"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  hipaa-nginx:
+    image: nginx:alpine
+    container_name: hipaa-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    networks:
+      - hipaa-network
+    depends_on:
+      - hipaa-api-gateway
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+
+  hipaa-prometheus:
+    image: prom/prometheus:latest
+    container_name: hipaa-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - hipaa-network
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  hipaa-grafana:
+    image: grafana/grafana:latest
+    container_name: hipaa-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=hipaa_grafana_admin_password_2024
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SERVER_ROOT_URL=https://localhost:3000
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=hipaa-postgres:5432
+      - GF_DATABASE_NAME=grafana
+      - GF_DATABASE_USER=grafana_user
+      - GF_DATABASE_PASSWORD=grafana_password_2024
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - hipaa-network
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - hipaa-postgres
+      - hipaa-prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  hipaa-filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: hipaa-filebeat
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/var/log/hipaa:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - hipaa-network
+    environment:
+      - ELASTICSEARCH_HOSTS=hipaa-elasticsearch:9200
+    depends_on:
+      - hipaa-elasticsearch
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+
+  hipaa-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: hipaa-elasticsearch
+    restart: unless-stopped
+    environment:
+      - cluster.name=hipaa-compliance-logs
+      - node.name=hipaa-elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_PASSWORD=hipaa_elastic_password_2024
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - hipaa-network
+    ports:
+      - "127.0.0.1:9200:9200"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  hipaa-kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: hipaa-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://hipaa-elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=hipaa_kibana_password_2024
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+    volumes:
+      - kibana-data:/usr/share/kibana/data
+    networks:
+      - hipaa-network
+    ports:
+      - "127.0.0.1:5601:5601"
+    depends_on:
+      - hipaa-elasticsearch
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+networks:
+  hipaa-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+  kibana-data:
+    driver: local
