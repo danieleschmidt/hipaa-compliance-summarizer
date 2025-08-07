@@ -1,0 +1,565 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hipaa-compliance
+  labels:
+    name: hipaa-compliance
+    security.hipaa/compliant: "true"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hipaa-config
+  namespace: hipaa-compliance
+data:
+  production.yml: |
+    environment: production
+    
+    compliance:
+      level: "strict"
+      audit_logging: true
+      encryption_at_rest: true
+      phi_detection_threshold: 0.95
+      
+    redaction:
+      method: "synthetic_replacement"
+      preserve_clinical_context: true
+      maintain_document_structure: true
+      
+    models:
+      phi_detector: "microsoft/presidio-analyzer"
+      clinical_summarizer: "microsoft/BioGPT-Large"
+      compliance_checker: "custom_hipaa_model_v2"
+      
+    security:
+      encryption_key_rotation: 90
+      access_logging: true
+      data_retention_policy: 2555
+      secure_deletion: true
+      max_failed_attempts: 5
+      auto_block_enabled: true
+      
+    monitoring:
+      health_check_interval: 30
+      metrics_collection_interval: 15
+      metrics_retention_hours: 168
+      
+    performance:
+      max_concurrent_jobs: 20
+      batch_size: 100
+      cache_max_size: 10000
+      cache_ttl_seconds: 3600
+      processing_timeout: 600
+      
+    autoscaling:
+      min_instances: 2
+      max_instances: 50
+      scale_up_threshold: 0.7
+      scale_down_threshold: 0.3
+      cooldown_period_minutes: 5
+      
+    output:
+      include_confidence_scores: true
+      generate_audit_trail: true
+      compliance_score: true
+      redaction_summary: true
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hipaa-secrets
+  namespace: hipaa-compliance
+type: Opaque
+data:
+  # Base64 encoded secrets (replace with actual values in production)
+  database-url: cG9zdGdyZXNxbDovL2hpcGFhX3VzZXI6aGlwYWFfcGFzc3dvcmRAaGlwYWEtcG9zdGdyZXM6NTQzMi9oaXBhYV9jb21wbGlhbmNl
+  redis-url: cmVkaXM6Ly86aGlwYWFfcmVkaXNfcGFzc3dvcmRAaGlwYWEtcmVkaXM6NjM3OS8w
+  encryption-key: aGlwYWFfZW5jcnlwdGlvbl9rZXlfcHJvZHVjdGlvbl8yMDI0
+  jwt-secret: aGlwYWFfand0X3NlY3JldF9wcm9kdWN0aW9uXzIwMjQ=
+  epic-api-key: ZXBpY19hcGlfa2V5X3Byb2R1Y3Rpb25fMjAyNA==
+  aws-access-key-id: YXdzX2FjY2Vzc19rZXlfaWRfcHJvZHVjdGlvbg==
+  aws-secret-access-key: YXdzX3NlY3JldF9hY2Nlc3Nfa2V5X3Byb2R1Y3Rpb24=
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-api-gateway
+  namespace: hipaa-compliance
+  labels:
+    app: hipaa-api-gateway
+    tier: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hipaa-api-gateway
+  template:
+    metadata:
+      labels:
+        app: hipaa-api-gateway
+        tier: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: api-gateway
+        image: hipaa-compliance-system:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: HIPAA_CONFIG_PATH
+          value: "/app/config/production.yml"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: redis-url
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: encryption-key
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: jwt-secret
+        - name: EPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: epic-api-key
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: aws-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: aws-secret-access-key
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: data-volume
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: hipaa-config
+      - name: data-volume
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-document-processor
+  namespace: hipaa-compliance
+  labels:
+    app: hipaa-document-processor
+    tier: worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: hipaa-document-processor
+  template:
+    metadata:
+      labels:
+        app: hipaa-document-processor
+        tier: worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: document-processor
+        image: hipaa-compliance-system:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "hipaa_compliance_summarizer.workers.document_processor_worker"]
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: HIPAA_CONFIG_PATH
+          value: "/app/config/production.yml"
+        - name: WORKER_TYPE
+          value: "document_processor"
+        - name: MAX_CONCURRENT_TASKS
+          value: "10"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: redis-url
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: encryption-key
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: data-volume
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: hipaa-config
+      - name: data-volume
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-compliance-worker
+  namespace: hipaa-compliance
+  labels:
+    app: hipaa-compliance-worker
+    tier: worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hipaa-compliance-worker
+  template:
+    metadata:
+      labels:
+        app: hipaa-compliance-worker
+        tier: worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: compliance-worker
+        image: hipaa-compliance-system:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "hipaa_compliance_summarizer.workers.compliance_worker"]
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: HIPAA_CONFIG_PATH
+          value: "/app/config/production.yml"
+        - name: WORKER_TYPE
+          value: "compliance_worker"
+        - name: MAX_CONCURRENT_TASKS
+          value: "8"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: redis-url
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: encryption-key
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: data-volume
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "1.5Gi"
+            cpu: "750m"
+          limits:
+            memory: "3Gi"
+            cpu: "1500m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: hipaa-config
+      - name: data-volume
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hipaa-api-gateway-service
+  namespace: hipaa-compliance
+  labels:
+    app: hipaa-api-gateway
+spec:
+  selector:
+    app: hipaa-api-gateway
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hipaa-api-gateway-ingress
+  namespace: hipaa-compliance
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - hipaa-api.yourdomain.com
+    secretName: hipaa-api-tls
+  rules:
+  - host: hipaa-api.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hipaa-api-gateway-service
+            port:
+              number: 8000
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hipaa-api-gateway-pdb
+  namespace: hipaa-compliance
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: hipaa-api-gateway
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hipaa-document-processor-pdb
+  namespace: hipaa-compliance
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: hipaa-document-processor
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hipaa-api-gateway-hpa
+  namespace: hipaa-compliance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hipaa-api-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hipaa-document-processor-hpa
+  namespace: hipaa-compliance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hipaa-document-processor
+  minReplicas: 5
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hipaa-network-policy
+  namespace: hipaa-compliance
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: api
+    - podSelector:
+        matchLabels:
+          tier: worker
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to:
+    - podSelector:
+        matchLabels:
+          tier: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          tier: cache
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS outbound
+    - protocol: TCP
+      port: 80   # HTTP outbound
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: hipaa-resource-quota
+  namespace: hipaa-compliance
+spec:
+  hard:
+    requests.cpu: "50"
+    requests.memory: 100Gi
+    limits.cpu: "100"
+    limits.memory: 200Gi
+    pods: "100"
+    persistentvolumeclaims: "20"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"

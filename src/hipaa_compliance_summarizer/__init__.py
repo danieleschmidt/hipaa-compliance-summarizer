@@ -39,6 +39,33 @@ from .scaling import (
     initialize_scaling_infrastructure,
     get_scaling_status,
 )
+from .advanced_security import (
+    SecurityMonitor,
+    get_security_monitor,
+    initialize_security_monitoring,
+    log_security_event,
+    get_security_dashboard,
+    block_suspicious_ip,
+    security_context,
+)
+from .advanced_monitoring import (
+    AdvancedMonitor,
+    HealthStatus,
+    AlertSeverity,
+    get_advanced_monitor,
+    initialize_advanced_monitoring,
+    CircuitBreaker,
+    CircuitBreakerConfig,
+)
+from .advanced_error_handling import (
+    AdvancedErrorHandler,
+    ErrorSeverity,
+    ErrorCategory,
+    get_error_handler,
+    initialize_error_handling,
+    retry_on_failure,
+    safe_operation,
+)
 
 __all__ = [
     "PHIRedactor",
@@ -78,4 +105,28 @@ __all__ = [
     "WorkerPool",
     "initialize_scaling_infrastructure",
     "get_scaling_status",
+    # Advanced Security
+    "SecurityMonitor",
+    "get_security_monitor",
+    "initialize_security_monitoring",
+    "log_security_event",
+    "get_security_dashboard",
+    "block_suspicious_ip",
+    "security_context",
+    # Advanced Monitoring
+    "AdvancedMonitor",
+    "HealthStatus",
+    "AlertSeverity",
+    "get_advanced_monitor",
+    "initialize_advanced_monitoring",
+    "CircuitBreaker",
+    "CircuitBreakerConfig",
+    # Advanced Error Handling
+    "AdvancedErrorHandler",
+    "ErrorSeverity",
+    "ErrorCategory",
+    "get_error_handler",
+    "initialize_error_handling",
+    "retry_on_failure",
+    "safe_operation",
 ]
