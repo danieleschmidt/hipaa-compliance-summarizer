@@ -3,9 +3,13 @@
 import logging
 import sys
 from argparse import ArgumentParser
+
 from hipaa_compliance_summarizer import BatchProcessor
-from hipaa_compliance_summarizer.startup import validate_environment, setup_logging_with_config
 from hipaa_compliance_summarizer.monitoring import PerformanceMonitor
+from hipaa_compliance_summarizer.startup import (
+    setup_logging_with_config,
+    validate_environment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +17,14 @@ logger = logging.getLogger(__name__)
 def _setup_and_validate() -> None:
     """Setup logging and validate environment configuration."""
     setup_logging_with_config()
-    
+
     validation = validate_environment(require_production_secrets=False)
     if not validation["valid"]:
         logger.error("Configuration validation failed:")
         for error in validation["errors"]:
             logger.error("  - %s", error)
         sys.exit(1)
-    
+
     if validation["warnings"]:
         for warning in validation["warnings"]:
             logger.warning(warning)
@@ -97,7 +101,7 @@ def _display_memory_stats(processor) -> None:
     if "error" not in memory_stats:
         logger.info("\nMemory Usage Statistics:")
         logger.info(f"Current Memory Usage: {memory_stats['current_memory_mb']:.1f} MB")
-        logger.info(f"Peak Memory Usage: {memory_stats['peak_memory_mb']:.1f} MB") 
+        logger.info(f"Peak Memory Usage: {memory_stats['peak_memory_mb']:.1f} MB")
         cache_info = memory_stats['cache_memory_usage']
         logger.info(f"File Cache: {cache_info['file_cache_size']}/{cache_info['file_cache_max']} files")
     else:
@@ -111,11 +115,11 @@ def main() -> None:
     compliance validation, and optional dashboard generation.
     """
     _setup_and_validate()
-    
+
     parser = _create_argument_parser()
     args = parser.parse_args()
 
-    monitor = PerformanceMonitor()  
+    monitor = PerformanceMonitor()
     processor = BatchProcessor(performance_monitor=monitor)
     results = processor.process_directory(
         args.input_dir,
@@ -125,7 +129,7 @@ def main() -> None:
     )
 
     _display_dashboard_output(processor, results, args)
-    
+
     if args.show_cache_performance:
         _display_cache_performance(processor)
 

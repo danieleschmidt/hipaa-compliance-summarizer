@@ -1,15 +1,15 @@
 """Analysis components for HIPAA compliance processing."""
 
-from .document_analyzer import DocumentAnalyzer, DocumentAnalysisResult
-from .phi_analyzer import PHIAnalyzer, PHIAnalysisResult
-from .compliance_analyzer import ComplianceAnalyzer, ComplianceAnalysisResult
-from .risk_analyzer import RiskAnalyzer, RiskAnalysisResult
+from .compliance_analyzer import ComplianceAnalysisResult, ComplianceAnalyzer
+from .document_analyzer import DocumentAnalysisResult, DocumentAnalyzer
 from .metrics import AnalyticsMetrics
+from .phi_analyzer import PHIAnalysisResult, PHIAnalyzer
+from .risk_analyzer import RiskAnalysisResult, RiskAnalyzer
 
 __all__ = [
     "DocumentAnalyzer",
     "DocumentAnalysisResult",
-    "PHIAnalyzer", 
+    "PHIAnalyzer",
     "PHIAnalysisResult",
     "ComplianceAnalyzer",
     "ComplianceAnalysisResult",

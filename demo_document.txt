@@ -1,0 +1,19 @@
+Patient: John Smith  
+DOB: 01/15/1980
+MRN: 123456789
+SSN: 555-12-3456
+
+Chief Complaint: Chest pain and shortness of breath
+
+History: 43-year-old male with history of hypertension presents with acute onset chest pain. Patient reports pain began at 0800 this morning while at work. Pain is described as crushing, substernal, radiating to left arm. Associated with diaphoresis and nausea.
+
+Assessment: Acute coronary syndrome, rule out myocardial infarction.
+
+Plan: 
+- Admit to cardiac care unit
+- Serial troponin levels  
+- EKG monitoring
+- Aspirin 325mg daily
+
+Provider: Dr. Sarah Johnson, MD
+Phone: (555) 123-4567

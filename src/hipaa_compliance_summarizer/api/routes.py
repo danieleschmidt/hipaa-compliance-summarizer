@@ -1,29 +1,29 @@
 """API routes for HIPAA compliance processing."""
 
-import logging
-from typing import List, Optional
-from datetime import datetime, timedelta
-import uuid
 import hashlib
+import logging
+import uuid
+from datetime import datetime
+from typing import List
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Query, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
-from ..processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
-from ..batch import BatchProcessor, BatchDashboard
+from ..batch import BatchDashboard, BatchProcessor
+from ..database.repositories import (
+    AuditRepository,
+    DocumentRepository,
+    PHIDetectionRepository,
+)
+from ..processor import ComplianceLevel, HIPAAProcessor
 from ..services.phi_detection_service import PHIDetectionService
-from ..database import get_db_connection
-from ..database.repositories import DocumentRepository, PHIDetectionRepository, AuditRepository
-from ..models.audit_log import AuditEvent, AuditAction
 from .schemas import (
-    DocumentUploadResponse, 
-    DocumentProcessRequest, 
-    DocumentProcessResponse,
-    PHIDetectionResponse,
-    ComplianceReportResponse,
     BatchProcessRequest,
     BatchProcessResponse,
+    ComplianceReportResponse,
+    DocumentProcessRequest,
+    DocumentProcessResponse,
+    DocumentUploadResponse,
+    PHIDetectionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,15 +87,15 @@ async def upload_document(
         # Validate file
         if not file.filename:
             raise HTTPException(status_code=400, detail="No file provided")
-        
+
         # Read file content
         content = await file.read()
         if len(content) > 50 * 1024 * 1024:  # 50MB limit
             raise HTTPException(status_code=413, detail="File too large (max 50MB)")
-        
+
         # Calculate file hash
         file_hash = hashlib.sha256(content).hexdigest()
-        
+
         # Check for duplicate
         existing_doc = doc_repo.get_by_hash(file_hash)
         if existing_doc:
@@ -105,7 +105,7 @@ async def upload_document(
                 status="duplicate",
                 message="Document already exists"
             )
-        
+
         # Create document record
         from ..database.models import Document
         document = Document(
@@ -120,10 +120,10 @@ async def upload_document(
             uploaded_by="api_user",  # Would come from auth context
             created_at=datetime.utcnow(),
         )
-        
+
         # Save to database
         doc_repo.create(document)
-        
+
         # Create audit record
         from ..database.models import AuditRecord
         audit_record = AuditRecord(
@@ -137,16 +137,16 @@ async def upload_document(
             created_at=datetime.utcnow(),
         )
         audit_repo.create(audit_record)
-        
+
         logger.info(f"Document uploaded successfully: {document.id}")
-        
+
         return DocumentUploadResponse(
             document_id=document.id,
             filename=file.filename,
             status="uploaded",
             message="Document uploaded successfully"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -174,24 +174,24 @@ async def process_document(
         document = doc_repo.get_by_id(document_id)
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         if document.processing_status == "completed":
             raise HTTPException(status_code=409, detail="Document already processed")
-        
+
         # Update status to processing
         doc_repo.update_processing_status(document_id, "processing", "api_processor")
-        
+
         # Process document
         processor.compliance_level = ComplianceLevel(request.compliance_level)
         result = processor.process_document(document.original_content)
-        
+
         # Enhanced PHI detection
         phi_result = phi_service.detect_phi_entities(
             document.original_content,
             detection_method=request.detection_method,
             confidence_threshold=request.confidence_threshold
         )
-        
+
         # Save PHI detections
         from ..database.models import PHIDetection
         for entity in phi_result.entities:
@@ -211,23 +211,23 @@ async def process_document(
                 created_at=datetime.utcnow(),
             )
             phi_repo.create(detection)
-        
+
         # Update document with results
         doc_repo.update_compliance_metrics(
             document_id=document_id,
             compliance_score=result.compliance_score,
             phi_count=len(phi_result.entities),
-            risk_level=max([e.risk_level for e in phi_result.entities], default="low", 
+            risk_level=max([e.risk_level for e in phi_result.entities], default="low",
                           key=lambda x: ["low", "medium", "high", "critical"].index(x)),
             redacted_content=result.redacted.text,
             summary=result.summary
         )
-        
+
         # Update status to completed
         doc_repo.update_processing_status(document_id, "completed")
-        
+
         logger.info(f"Document processed successfully: {document_id}")
-        
+
         return DocumentProcessResponse(
             document_id=document_id,
             processing_status="completed",
@@ -239,7 +239,7 @@ async def process_document(
             processing_time_ms=phi_result.processing_time_ms,
             confidence_scores=phi_result.confidence_scores,
         )
-        
+
     except HTTPException:
         # Update status to failed
         doc_repo.update_processing_status(document_id, "failed")
@@ -267,30 +267,30 @@ async def get_document(
         document = doc_repo.get_by_id(document_id)
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         # Get PHI detections
         phi_detections = phi_repo.get_by_document_id(document_id)
-        
+
         # Calculate confidence scores by category
         confidence_scores = {}
         if phi_detections:
             category_scores = {}
             category_counts = {}
-            
+
             for detection in phi_detections:
                 category = detection.entity_category
                 if category not in category_scores:
                     category_scores[category] = 0.0
                     category_counts[category] = 0
-                
+
                 category_scores[category] += detection.confidence_score
                 category_counts[category] += 1
-            
+
             confidence_scores = {
                 category: score / category_counts[category]
                 for category, score in category_scores.items()
             }
-        
+
         return DocumentProcessResponse(
             document_id=document.id,
             processing_status=document.processing_status,
@@ -301,7 +301,7 @@ async def get_document(
             processing_time_ms=0.0,  # Not stored
             confidence_scores=confidence_scores,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -323,7 +323,7 @@ async def get_phi_detections(
     """Get PHI detections for a document."""
     try:
         detections = phi_repo.get_by_document_id(document_id)
-        
+
         return [
             PHIDetectionResponse(
                 detection_id=d.id,
@@ -340,7 +340,7 @@ async def get_phi_detections(
             )
             for d in detections
         ]
-        
+
     except Exception as e:
         logger.error(f"Failed to get PHI detections: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve PHI detections")
@@ -365,13 +365,13 @@ async def start_batch_process(
             doc = doc_repo.get_by_id(doc_id)
             if doc:
                 documents.append(doc)
-        
+
         if not documents:
             raise HTTPException(status_code=400, detail="No valid documents found")
-        
+
         # Create batch processor
         batch_processor = BatchProcessor()
-        
+
         # Process documents (simplified for API - would be async in production)
         results = []
         for doc in documents:
@@ -379,7 +379,7 @@ async def start_batch_process(
                 processor = HIPAAProcessor(compliance_level=ComplianceLevel(request.compliance_level))
                 result = processor.process_document(doc.original_content)
                 results.append(result)
-                
+
                 # Update document status
                 doc_repo.update_compliance_metrics(
                     doc.id,
@@ -390,11 +390,11 @@ async def start_batch_process(
                     result.summary
                 )
                 doc_repo.update_processing_status(doc.id, "completed", "batch_processor")
-                
+
             except Exception as e:
                 logger.error(f"Failed to process document {doc.id}: {e}")
                 doc_repo.update_processing_status(doc.id, "failed")
-        
+
         # Generate dashboard
         successful_results = [r for r in results if hasattr(r, 'compliance_score')]
         dashboard = BatchDashboard(
@@ -402,10 +402,10 @@ async def start_batch_process(
             avg_compliance_score=sum(r.compliance_score for r in successful_results) / len(successful_results) if successful_results else 0.0,
             total_phi_detected=sum(r.phi_detected_count for r in successful_results),
         )
-        
+
         batch_id = str(uuid.uuid4())
         logger.info(f"Batch processing completed: {batch_id}")
-        
+
         return BatchProcessResponse(
             batch_id=batch_id,
             status="completed",
@@ -414,7 +414,7 @@ async def start_batch_process(
             avg_compliance_score=dashboard.avg_compliance_score,
             total_phi_detected=dashboard.total_phi_detected,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -440,20 +440,20 @@ async def generate_compliance_report(
     try:
         # Get processing summary
         processing_summary = doc_repo.get_processing_summary()
-        
+
         # Get PHI statistics
         phi_stats = phi_repo.get_statistics()
-        
+
         # Calculate compliance metrics
         total_documents = processing_summary.get("total_documents", 0)
         completed_documents = processing_summary.get("completed", 0)
         avg_compliance_score = processing_summary.get("avg_compliance_score", 0.0)
         total_phi_entities = processing_summary.get("total_phi_entities", 0)
         high_risk_count = processing_summary.get("high_risk_count", 0)
-        
+
         # Generate report
         report_id = str(uuid.uuid4())
-        
+
         return ComplianceReportResponse(
             report_id=report_id,
             report_type=report_type,
@@ -468,7 +468,7 @@ async def generate_compliance_report(
             compliance_violations=0,  # Would calculate from actual violations
             generated_at=datetime.utcnow(),
         )
-        
+
     except Exception as e:
         logger.error(f"Compliance report generation failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate compliance report")
@@ -488,7 +488,7 @@ async def get_system_stats(
     try:
         processing_summary = doc_repo.get_processing_summary()
         phi_stats = phi_repo.get_statistics()
-        
+
         return {
             "documents": processing_summary,
             "phi_detection": phi_stats,
@@ -498,7 +498,7 @@ async def get_system_stats(
                 "last_updated": datetime.utcnow().isoformat(),
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get system stats: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve system statistics")

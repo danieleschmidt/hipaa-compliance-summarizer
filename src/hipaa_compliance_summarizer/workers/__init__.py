@@ -1,20 +1,14 @@
 """Background workers for HIPAA compliance processing."""
 
-from .queue_manager import (
-    QueueManager,
-    JobStatus,
-    Job,
-    JobResult
-)
-
-from .document_processor_worker import DocumentProcessorWorker
 from .compliance_worker import ComplianceWorker
+from .document_processor_worker import DocumentProcessorWorker
 from .notification_worker import NotificationWorker
+from .queue_manager import Job, JobResult, JobStatus, QueueManager
 
 __all__ = [
     "QueueManager",
     "JobStatus",
-    "Job", 
+    "Job",
     "JobResult",
     "DocumentProcessorWorker",
     "ComplianceWorker",

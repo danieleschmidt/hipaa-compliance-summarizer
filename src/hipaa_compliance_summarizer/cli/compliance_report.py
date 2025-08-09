@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Generate a simple compliance report."""
-from argparse import ArgumentParser
 import logging
+from argparse import ArgumentParser
+
 from hipaa_compliance_summarizer import ComplianceReporter
 
 
@@ -30,7 +31,7 @@ def main() -> None:
     # Set up logging for CLI output
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     logger = logging.getLogger(__name__)
-    
+
     reporter = ComplianceReporter()
     report = reporter.generate_report(
         period=args.audit_period,

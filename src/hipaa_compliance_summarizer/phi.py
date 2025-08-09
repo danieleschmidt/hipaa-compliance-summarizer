@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from functools import lru_cache
 import hashlib
+import logging
 import re
 import time
-from typing import Dict, List, Tuple, Optional
-import logging
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Dict, List, Optional, Tuple
 
 from .config import CONFIG
 from .constants import PERFORMANCE_LIMITS
-from .phi_patterns import pattern_manager, PHIPatternConfig
+from .phi_patterns import PHIPatternConfig, pattern_manager
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def _detect_phi_cached(text: str, patterns_hash: str, patterns_tuple: Tuple[Tupl
     """
     # Recreate patterns dict from tuple
     patterns = {name: _compile_pattern(expr) for name, expr in patterns_tuple}
-    
+
     entities: List[Entity] = []
     for etype, pattern in patterns.items():
         for match in pattern.finditer(text):
@@ -74,7 +74,7 @@ def _detect_phi_cached(text: str, patterns_hash: str, patterns_tuple: Tuple[Tupl
                 entities.append(
                     Entity(etype, match.group(), match.start(), match.end())
                 )
-    
+
     entities.sort(key=lambda e: e.start)
     return tuple(entities)
 
@@ -82,7 +82,7 @@ def _detect_phi_cached(text: str, patterns_hash: str, patterns_tuple: Tuple[Tupl
 class PHIRedactor:
     """Advanced PHI detection and redaction utility with modular pattern support."""
 
-    def __init__(self, mask: str = "[REDACTED]", patterns: Dict[str, str] | None = None, 
+    def __init__(self, mask: str = "[REDACTED]", patterns: Dict[str, str] | None = None,
                  pattern_config: Optional[PHIPatternConfig] = None,
                  performance_monitor: Optional[object] = None) -> None:
         """
@@ -96,16 +96,16 @@ class PHIRedactor:
         """
         self.mask = mask
         self.performance_monitor = performance_monitor
-        
+
         # Initialize pattern manager if not already done
         if not pattern_manager._default_patterns_loaded:
             pattern_manager.load_default_patterns()
-        
+
         # Load patterns from config if available
         config_patterns = CONFIG.get("patterns", {})
         if config_patterns:
             pattern_manager.load_patterns_from_config(CONFIG)
-        
+
         # Handle legacy patterns parameter for backward compatibility
         if patterns:
             logger.info("Using legacy patterns parameter - consider migrating to modular pattern system")
@@ -114,32 +114,32 @@ class PHIRedactor:
             # Use patterns from the modular system
             pattern_configs = pattern_manager.get_all_patterns()
             raw_patterns = {name: config.pattern for name, config in pattern_configs.items()}
-        
+
         # Compile patterns for performance
         self.patterns = {name: _compile_pattern(expr) for name, expr in raw_patterns.items()}
-        
+
         # Create hashable representation for caching
         self._patterns_tuple = tuple(sorted(raw_patterns.items()))
         self._patterns_hash = hashlib.sha256(str(self._patterns_tuple).encode()).hexdigest()
-        
+
         logger.info(f"Initialized PHI redactor with {len(self.patterns)} patterns")
 
     def detect(self, text: str) -> List[Entity]:
         """Detect PHI entities in ``text``."""
         start_time = time.time() if self.performance_monitor else None
-        
+
         # Check cache first for monitoring purposes
         cache_key = (text, self._patterns_hash, self._patterns_tuple)
         cache_hit = _detect_phi_cached.cache_info().hits
-        
+
         # Use cached detection for performance
         cached_entities = _detect_phi_cached(text, self._patterns_hash, self._patterns_tuple)
-        
+
         # Record performance metrics if monitor is available
         if self.performance_monitor and start_time:
             detection_time = time.time() - start_time
             was_cache_hit = _detect_phi_cached.cache_info().hits > cache_hit
-            
+
             # Record metrics for each pattern that had matches
             entity_types = {entity.type for entity in cached_entities}
             for pattern_name in entity_types:
@@ -148,14 +148,14 @@ class PHIRedactor:
                 # Get confidence from pattern config or use default
                 pattern_config = pattern_configs.get(pattern_name)
                 confidence = pattern_config.confidence_threshold if pattern_config else 0.95
-                
+
                 self.performance_monitor.record_pattern_performance(
                     pattern_name,
                     detection_time / len(entity_types),  # Distribute time across matching patterns
                     was_cache_hit,
                     confidence
                 )
-        
+
         # Convert back to list for compatibility
         return list(cached_entities)
 
@@ -176,7 +176,7 @@ class PHIRedactor:
         text_parts: list[str] = []
         entities: list[Entity] = []
         pos = 0
-        with open(path, "r") as fh:
+        with open(path) as fh:
             for chunk in iter(lambda: fh.read(chunk_size), ""):
                 chunk_result = self.redact(chunk)
                 text_parts.append(chunk_result.text)
@@ -202,16 +202,16 @@ class PHIRedactor:
             "pattern_compilation": _compile_pattern.cache_info(),
             "phi_detection": _detect_phi_cached.cache_info()
         }
-        
+
         # Include pattern manager cache info
         pattern_manager_cache = pattern_manager.get_cache_info()
         phi_cache_info.update({
             "pattern_manager": pattern_manager_cache
         })
-        
+
         return phi_cache_info
-    
-    def add_custom_pattern(self, name: str, pattern: str, description: str = "", 
+
+    def add_custom_pattern(self, name: str, pattern: str, description: str = "",
                           confidence_threshold: float = 0.95, category: str = "custom") -> None:
         """Add a custom PHI pattern to the redactor.
         
@@ -229,13 +229,13 @@ class PHIRedactor:
             confidence_threshold=confidence_threshold,
             category=category
         )
-        
+
         pattern_manager.add_custom_pattern(phi_pattern, category)
-        
+
         # Update this redactor's patterns
         self._refresh_patterns()
         logger.info(f"Added custom pattern '{name}' and refreshed redactor")
-    
+
     def disable_pattern(self, pattern_name: str) -> bool:
         """Disable a specific pattern by name.
         
@@ -249,7 +249,7 @@ class PHIRedactor:
         if result:
             self._refresh_patterns()
         return result
-    
+
     def enable_pattern(self, pattern_name: str) -> bool:
         """Enable a specific pattern by name.
         
@@ -263,7 +263,7 @@ class PHIRedactor:
         if result:
             self._refresh_patterns()
         return result
-    
+
     def list_patterns(self) -> Dict[str, Dict[str, str]]:
         """List all available patterns with their details.
         
@@ -281,18 +281,18 @@ class PHIRedactor:
             }
             for name, config in patterns.items()
         }
-    
+
     def get_pattern_statistics(self) -> Dict[str, int]:
         """Get statistics about the current pattern configuration."""
         return pattern_manager.get_pattern_statistics()
-    
+
     def _refresh_patterns(self) -> None:
         """Refresh the internal pattern cache after configuration changes."""
         # Use cached compiled patterns from pattern manager
         compiled_patterns = pattern_manager.get_compiled_patterns()
         pattern_configs = pattern_manager.get_all_patterns()
         raw_patterns = {name: config.pattern for name, config in pattern_configs.items()}
-        
+
         # Update compiled patterns using cached versions when available
         self.patterns = {}
         for name, expr in raw_patterns.items():
@@ -300,12 +300,12 @@ class PHIRedactor:
                 self.patterns[name] = compiled_patterns[name]
             else:
                 self.patterns[name] = _compile_pattern(expr)
-        
+
         # Update cache keys
         self._patterns_tuple = tuple(sorted(raw_patterns.items()))
         self._patterns_hash = hashlib.sha256(str(self._patterns_tuple).encode()).hexdigest()
-        
+
         # Clear relevant caches since patterns changed
         _detect_phi_cached.cache_clear()
-        
+
         logger.debug(f"Refreshed patterns - now using {len(self.patterns)} patterns")

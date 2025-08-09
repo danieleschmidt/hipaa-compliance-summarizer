@@ -1,36 +1,36 @@
 """Audit logging models for HIPAA compliance tracking."""
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Dict, Any, List
-from datetime import datetime
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class AuditAction(str, Enum):
     """Types of auditable actions in the system."""
-    
+
     # Document processing actions
     DOCUMENT_UPLOADED = "document_uploaded"
     DOCUMENT_PROCESSED = "document_processed"
     DOCUMENT_DELETED = "document_deleted"
-    
+
     # PHI-related actions
     PHI_DETECTED = "phi_detected"
     PHI_REDACTED = "phi_redacted"
     PHI_ACCESSED = "phi_accessed"
-    
+
     # System actions
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
     SYSTEM_START = "system_start"
     SYSTEM_STOP = "system_stop"
-    
+
     # Compliance actions
     COMPLIANCE_REPORT_GENERATED = "compliance_report_generated"
     AUDIT_LOG_ACCESSED = "audit_log_accessed"
     CONFIGURATION_CHANGED = "configuration_changed"
-    
+
     # Security actions
     UNAUTHORIZED_ACCESS_ATTEMPT = "unauthorized_access_attempt"
     SECURITY_VIOLATION = "security_violation"
@@ -40,44 +40,44 @@ class AuditAction(str, Enum):
 @dataclass
 class AuditEvent:
     """Represents a single auditable event in the system."""
-    
+
     # Core event identification
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     action: AuditAction = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    
+
     # User and session information
     user_id: Optional[str] = None
     session_id: Optional[str] = None
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
-    
+
     # Resource information
     resource_type: Optional[str] = None  # document, phi_entity, system, etc.
     resource_id: Optional[str] = None
     resource_path: Optional[str] = None
-    
+
     # Event details
     description: Optional[str] = None
     details: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Compliance tracking
     compliance_relevant: bool = True
     retention_period_days: int = 2555  # 7 years for HIPAA
-    
+
     # Security classification
     security_level: str = "normal"  # normal, sensitive, critical
     requires_investigation: bool = False
-    
+
     def __post_init__(self):
         """Validate and normalize audit event data."""
         if self.action is None:
             raise ValueError("Audit action is required")
-        
+
         # Ensure timestamp is UTC
         if self.timestamp.tzinfo is None:
             self.timestamp = self.timestamp.replace(tzinfo=datetime.now().astimezone().tzinfo)
-        
+
         # Set security level based on action
         if self.action in [
             AuditAction.PHI_DETECTED,
@@ -86,13 +86,13 @@ class AuditEvent:
             AuditAction.UNAUTHORIZED_ACCESS_ATTEMPT
         ]:
             self.security_level = "sensitive"
-        
+
         if self.action in [
             AuditAction.SECURITY_VIOLATION,
             AuditAction.UNAUTHORIZED_ACCESS_ATTEMPT
         ]:
             self.requires_investigation = True
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -113,13 +113,13 @@ class AuditEvent:
             "security_level": self.security_level,
             "requires_investigation": self.requires_investigation,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AuditEvent":
         """Create AuditEvent from dictionary."""
         action = AuditAction(data["action"])
         timestamp = datetime.fromisoformat(data["timestamp"])
-        
+
         return cls(
             event_id=data["event_id"],
             action=action,
@@ -143,49 +143,49 @@ class AuditEvent:
 @dataclass
 class AuditLog:
     """Container for audit events with query and filtering capabilities."""
-    
+
     events: List[AuditEvent] = field(default_factory=list)
     log_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.utcnow)
-    
+
     def add_event(self, event: AuditEvent) -> None:
         """Add an audit event to the log."""
         self.events.append(event)
-    
+
     def get_events_by_action(self, action: AuditAction) -> List[AuditEvent]:
         """Get all events matching a specific action."""
         return [event for event in self.events if event.action == action]
-    
+
     def get_events_by_user(self, user_id: str) -> List[AuditEvent]:
         """Get all events for a specific user."""
         return [event for event in self.events if event.user_id == user_id]
-    
+
     def get_events_by_resource(self, resource_type: str, resource_id: str = None) -> List[AuditEvent]:
         """Get all events for a specific resource."""
         events = [event for event in self.events if event.resource_type == resource_type]
         if resource_id:
             events = [event for event in events if event.resource_id == resource_id]
         return events
-    
+
     def get_security_events(self) -> List[AuditEvent]:
         """Get all security-related events."""
         return [event for event in self.events if event.security_level in ["sensitive", "critical"]]
-    
+
     def get_events_requiring_investigation(self) -> List[AuditEvent]:
         """Get all events that require investigation."""
         return [event for event in self.events if event.requires_investigation]
-    
+
     def get_events_in_timeframe(self, start_time: datetime, end_time: datetime) -> List[AuditEvent]:
         """Get all events within a specific timeframe."""
         return [
-            event for event in self.events 
+            event for event in self.events
             if start_time <= event.timestamp <= end_time
         ]
-    
+
     def get_compliance_events(self) -> List[AuditEvent]:
         """Get all compliance-relevant events."""
         return [event for event in self.events if event.compliance_relevant]
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -194,7 +194,7 @@ class AuditLog:
             "event_count": len(self.events),
             "events": [event.to_dict() for event in self.events]
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AuditLog":
         """Create AuditLog from dictionary."""
@@ -202,36 +202,36 @@ class AuditLog:
             log_id=data["log_id"],
             created_at=datetime.fromisoformat(data["created_at"])
         )
-        
+
         for event_data in data.get("events", []):
             event = AuditEvent.from_dict(event_data)
             log.add_event(event)
-        
+
         return log
-    
+
     def generate_summary_report(self) -> Dict[str, Any]:
         """Generate a summary report of audit log contents."""
         action_counts = {}
         user_counts = {}
         security_event_count = 0
         investigation_required_count = 0
-        
+
         for event in self.events:
             # Count actions
             action_counts[event.action.value] = action_counts.get(event.action.value, 0) + 1
-            
+
             # Count users
             if event.user_id:
                 user_counts[event.user_id] = user_counts.get(event.user_id, 0) + 1
-            
+
             # Count security events
             if event.security_level in ["sensitive", "critical"]:
                 security_event_count += 1
-            
+
             # Count events requiring investigation
             if event.requires_investigation:
                 investigation_required_count += 1
-        
+
         return {
             "log_summary": {
                 "log_id": self.log_id,

@@ -1,18 +1,15 @@
 """API middleware for authentication, authorization, and auditing."""
 
-import time
 import logging
+import time
 import uuid
-from typing import Dict, Any
-import json
+from typing import Any, Dict
 
-from fastapi import Request, Response, HTTPException, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..database import get_db_connection
-from ..database.repositories import AuditRepository
 from ..database.models import AuditRecord
+from ..database.repositories import AuditRepository
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +20,7 @@ rate_limit_store: Dict[str, Dict[str, Any]] = {}
 async def security_headers_middleware(request: Request, call_next):
     """Add security headers to all responses."""
     response = await call_next(request)
-    
+
     # Security headers
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -31,14 +28,14 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
-    
+
     # HIPAA compliance headers
     response.headers["X-HIPAA-Compliant"] = "true"
     response.headers["X-PHI-Protected"] = "true"
-    
+
     # Remove server information
     response.headers.pop("Server", None)
-    
+
     return response
 
 
@@ -48,7 +45,7 @@ async def auth_middleware(request: Request, call_next):
     public_paths = ["/health", "/metrics", "/docs", "/redoc", "/openapi.json"]
     if any(request.url.path.startswith(path) for path in public_paths):
         return await call_next(request)
-    
+
     # Extract authorization header
     auth_header = request.headers.get("Authorization")
     if not auth_header:
@@ -61,7 +58,7 @@ async def auth_middleware(request: Request, call_next):
                 "timestamp": time.time()
             }
         )
-    
+
     # Validate bearer token format
     if not auth_header.startswith("Bearer "):
         return JSONResponse(
@@ -73,10 +70,10 @@ async def auth_middleware(request: Request, call_next):
                 "timestamp": time.time()
             }
         )
-    
+
     # Extract token
     token = auth_header[7:]  # Remove "Bearer " prefix
-    
+
     # Validate token (simplified - use proper JWT validation in production)
     if not _validate_api_token(token):
         return JSONResponse(
@@ -88,15 +85,15 @@ async def auth_middleware(request: Request, call_next):
                 "timestamp": time.time()
             }
         )
-    
+
     # Extract user information from token
     user_info = _extract_user_info(token)
-    
+
     # Add user context to request
     request.state.user_id = user_info.get("user_id", "unknown")
     request.state.user_role = user_info.get("role", "user")
     request.state.session_id = user_info.get("session_id", str(uuid.uuid4()))
-    
+
     # Check authorization for sensitive endpoints
     if not _check_authorization(request.url.path, request.method, user_info):
         return JSONResponse(
@@ -108,7 +105,7 @@ async def auth_middleware(request: Request, call_next):
                 "timestamp": time.time()
             }
         )
-    
+
     return await call_next(request)
 
 
@@ -117,10 +114,10 @@ async def rate_limit_middleware(request: Request, call_next):
     # Skip rate limiting for health checks
     if request.url.path in ["/health", "/metrics"]:
         return await call_next(request)
-    
+
     # Get client identifier (API key or IP address)
     client_id = _get_client_id(request)
-    
+
     # Check rate limits
     if not _check_rate_limit(client_id, request.url.path):
         return JSONResponse(
@@ -134,16 +131,16 @@ async def rate_limit_middleware(request: Request, call_next):
             },
             headers={"Retry-After": "60"}
         )
-    
+
     # Process request
     response = await call_next(request)
-    
+
     # Add rate limit headers
     limit_info = _get_rate_limit_info(client_id)
     response.headers["X-RateLimit-Limit"] = str(limit_info["limit"])
     response.headers["X-RateLimit-Remaining"] = str(limit_info["remaining"])
     response.headers["X-RateLimit-Reset"] = str(limit_info["reset_time"])
-    
+
     return response
 
 
@@ -152,16 +149,16 @@ async def audit_middleware(request: Request, call_next):
     # Generate request ID
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
-    
+
     # Capture request start time
     start_time = time.time()
-    
+
     # Extract request information
     user_id = getattr(request.state, "user_id", None)
     session_id = getattr(request.state, "session_id", None)
     ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("User-Agent", "unknown")
-    
+
     # Process request
     try:
         response = await call_next(request)
@@ -181,13 +178,13 @@ async def audit_middleware(request: Request, call_next):
                 "timestamp": time.time()
             }
         )
-    
+
     # Calculate processing time
     processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
-    
+
     # Add request ID to response
     response.headers["X-Request-ID"] = request_id
-    
+
     # Create audit record for sensitive operations
     if _should_audit_request(request.url.path, request.method):
         try:
@@ -207,7 +204,7 @@ async def audit_middleware(request: Request, call_next):
                 security_level=_get_security_level(request.url.path),
                 compliance_relevant=True,
             )
-            
+
             # Add additional event data
             event_data = {
                 "request_id": request_id,
@@ -217,14 +214,14 @@ async def audit_middleware(request: Request, call_next):
                 "method": request.method,
             }
             audit_record.set_event_data(event_data)
-            
+
             # Save audit record
             audit_repo = AuditRepository()
             audit_repo.create(audit_record)
-            
+
         except Exception as e:
             logger.error(f"Failed to create audit record: {e}")
-    
+
     # Log request
     logger.info(
         f"API Request - {request.method} {request.url.path} - "
@@ -233,7 +230,7 @@ async def audit_middleware(request: Request, call_next):
         f"Time: {processing_time:.2f}ms - "
         f"ID: {request_id}"
     )
-    
+
     return response
 
 
@@ -260,25 +257,25 @@ def _check_authorization(path: str, method: str, user_info: Dict[str, Any]) -> b
     """Check if user is authorized for the operation."""
     # Simplified authorization logic
     # In production, implement proper RBAC
-    
+
     permissions = user_info.get("permissions", [])
-    
+
     # Read operations
     if method == "GET":
         return "read" in permissions
-    
+
     # Write operations
     if method in ["POST", "PUT", "PATCH"]:
         return "write" in permissions
-    
+
     # Delete operations
     if method == "DELETE":
         return "delete" in permissions
-    
+
     # Processing operations
     if "process" in path:
         return "process" in permissions
-    
+
     return True  # Allow by default for other operations
 
 
@@ -289,7 +286,7 @@ def _get_client_id(request: Request) -> str:
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
         return f"token_{token[:16]}"  # Use first 16 chars of token
-    
+
     # Fall back to IP address
     return request.client.host if request.client else "unknown"
 
@@ -297,29 +294,29 @@ def _get_client_id(request: Request) -> str:
 def _check_rate_limit(client_id: str, path: str) -> bool:
     """Check if client has exceeded rate limits."""
     current_time = time.time()
-    
+
     # Initialize client data if not exists
     if client_id not in rate_limit_store:
         rate_limit_store[client_id] = {
             "requests": [],
             "last_reset": current_time
         }
-    
+
     client_data = rate_limit_store[client_id]
-    
+
     # Clean old requests (older than 1 minute)
     client_data["requests"] = [
         req_time for req_time in client_data["requests"]
         if current_time - req_time < 60
     ]
-    
+
     # Check limits
     if len(client_data["requests"]) >= 100:  # 100 requests per minute
         return False
-    
+
     # Add current request
     client_data["requests"].append(current_time)
-    
+
     return True
 
 
@@ -327,11 +324,11 @@ def _get_rate_limit_info(client_id: str) -> Dict[str, Any]:
     """Get rate limit information for client."""
     if client_id not in rate_limit_store:
         return {"limit": 100, "remaining": 100, "reset_time": int(time.time() + 60)}
-    
+
     client_data = rate_limit_store[client_id]
     remaining = max(0, 100 - len(client_data["requests"]))
     reset_time = int(time.time() + 60)
-    
+
     return {
         "limit": 100,
         "remaining": remaining,
@@ -344,7 +341,7 @@ def _should_audit_request(path: str, method: str) -> bool:
     # Audit all non-GET requests
     if method != "GET":
         return True
-    
+
     # Audit sensitive GET requests
     sensitive_paths = [
         "/documents/",
@@ -353,7 +350,7 @@ def _should_audit_request(path: str, method: str) -> bool:
         "/batch/",
         "/system/"
     ]
-    
+
     return any(sensitive_path in path for sensitive_path in sensitive_paths)
 
 
@@ -366,16 +363,16 @@ def _get_event_type(path: str, method: str) -> str:
             return "document_access"
         elif method == "DELETE":
             return "document_delete"
-    
+
     if "/batch" in path:
         return "batch_process"
-    
+
     if "/compliance" in path:
         return "compliance_report"
-    
+
     if "/phi-detections" in path:
         return "phi_access"
-    
+
     return f"api_{method.lower()}"
 
 
@@ -411,13 +408,13 @@ def _get_security_level(path: str) -> str:
     # PHI-related operations are sensitive
     if any(keyword in path for keyword in ["phi", "detection", "redact"]):
         return "sensitive"
-    
+
     # System operations are critical
     if "/system" in path:
         return "critical"
-    
+
     # Compliance operations are sensitive
     if "/compliance" in path:
         return "sensitive"
-    
+
     return "normal"

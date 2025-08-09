@@ -844,7 +844,7 @@ class TestIntegrationScenarios:
             for _ in range(3)
         ]
         
-        input_data = {"document": f"Test document {i}"} for i in range(3)
+        input_data = [{"document": f"Test document {i}"} for i in range(3)]
         
         # Create concurrent execution tasks
         tasks = [

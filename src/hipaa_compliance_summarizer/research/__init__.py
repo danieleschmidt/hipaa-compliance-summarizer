@@ -9,23 +9,32 @@ This module contains cutting-edge research implementations for:
 """
 
 from .adaptive_phi_detection import AdaptivePHIDetector, PHIConfidenceModel
-from .compliance_prediction import CompliancePredictionEngine, RiskPredictor, RiskLevel, RiskPrediction
-from .federated_learning import FederatedComplianceModel, PrivacyPreservingTrainer, PrivacyBudget
+from .benchmark_suite import ComparativeAnalysis, ResearchBenchmarkSuite
+from .compliance_prediction import (
+    CompliancePredictionEngine,
+    RiskLevel,
+    RiskPrediction,
+    RiskPredictor,
+)
+from .federated_learning import (
+    FederatedComplianceModel,
+    PrivacyBudget,
+    PrivacyPreservingTrainer,
+)
 from .statistical_validation import StatisticalValidator, ValidationMetrics
-from .benchmark_suite import ResearchBenchmarkSuite, ComparativeAnalysis
 
 __all__ = [
     "AdaptivePHIDetector",
-    "PHIConfidenceModel", 
+    "PHIConfidenceModel",
     "CompliancePredictionEngine",
     "RiskPredictor",
     "RiskLevel",
-    "RiskPrediction", 
+    "RiskPrediction",
     "FederatedComplianceModel",
     "PrivacyPreservingTrainer",
     "PrivacyBudget",
     "StatisticalValidator",
     "ValidationMetrics",
-    "ResearchBenchmarkSuite", 
+    "ResearchBenchmarkSuite",
     "ComparativeAnalysis",
 ]

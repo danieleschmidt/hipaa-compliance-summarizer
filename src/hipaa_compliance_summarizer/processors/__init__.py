@@ -1,23 +1,17 @@
 """Processing pipeline components for HIPAA compliance."""
 
-from .pipeline import (
-    ProcessingPipeline,
-    PipelineStage,
-    PipelineResult,
-    PipelineConfig
-)
-
+from .pipeline import PipelineConfig, PipelineResult, PipelineStage, ProcessingPipeline
 from .transformers import (
-    DocumentTransformer,
-    PHIRedactionTransformer,
     ComplianceEnrichmentTransformer,
-    OutputTransformer
+    DocumentTransformer,
+    OutputTransformer,
+    PHIRedactionTransformer,
 )
 
 __all__ = [
     "ProcessingPipeline",
     "PipelineStage",
-    "PipelineResult", 
+    "PipelineResult",
     "PipelineConfig",
     "DocumentTransformer",
     "PHIRedactionTransformer",

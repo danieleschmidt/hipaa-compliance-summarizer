@@ -1,8 +1,8 @@
 """Monitoring and observability for HIPAA compliance system."""
 
-from .metrics import MetricsCollector, PerformanceMonitor, ComplianceMetrics
-from .health_checks import HealthCheckManager, HealthStatus, HealthCheckResult
 from .alerts import AlertManager, AlertRule
+from .health_checks import HealthCheckManager, HealthCheckResult, HealthStatus
+from .metrics import ComplianceMetrics, MetricsCollector, PerformanceMonitor
 from .tracing import Tracer
 
 # Compatibility aliases for legacy imports
@@ -11,10 +11,10 @@ SystemHealth = HealthStatus
 
 __all__ = [
     "MetricsCollector",
-    "PerformanceMonitor", 
+    "PerformanceMonitor",
     "ComplianceMetrics",
     "HealthCheckManager",
-    "HealthStatus", 
+    "HealthStatus",
     "HealthCheckResult",
     "HealthChecker",  # Compatibility alias
     "SystemHealth",   # Compatibility alias

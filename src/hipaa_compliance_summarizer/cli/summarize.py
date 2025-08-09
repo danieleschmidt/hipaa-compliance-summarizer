@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Example script to process a single medical document."""
-from argparse import ArgumentParser
 import logging
+from argparse import ArgumentParser
+
 from hipaa_compliance_summarizer import HIPAAProcessor
 
 
@@ -36,7 +37,7 @@ def main() -> None:
     # Set up logging for CLI output
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     logger = logging.getLogger(__name__)
-    
+
     processor = HIPAAProcessor(compliance_level=args.compliance_level)
     result = processor.process_document(args.file)
     logger.info(result.summary)

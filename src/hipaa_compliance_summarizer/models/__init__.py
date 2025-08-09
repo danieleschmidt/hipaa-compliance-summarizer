@@ -1,11 +1,11 @@
 """Data models for HIPAA compliance processing."""
 
-from .audit_log import AuditLog, AuditEvent, AuditAction
-from .phi_entity import PHIEntity, PHICategory, RedactionMethod
+from .audit_log import AuditAction, AuditEvent, AuditLog
+from .phi_entity import PHICategory, PHIEntity, RedactionMethod
 
 __all__ = [
     "AuditLog",
-    "AuditEvent", 
+    "AuditEvent",
     "AuditAction",
     "PHIEntity",
     "PHICategory",
