@@ -1,37 +1,41 @@
 from __future__ import annotations
 
+import json
+import logging
+import mmap
+import multiprocessing
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Sequence, Optional, Union
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
-import os
-import multiprocessing
-import mmap
-import json
-from typing import Iterator, Dict
+from typing import Dict, Iterator, List, Optional, Sequence, Union
 
 from .constants import PERFORMANCE_LIMITS, PROCESSING_CONSTANTS
 from .documents import Document, detect_document_type
-from .processor import HIPAAProcessor, ProcessingResult, ComplianceLevel
 from .phi import PHIRedactor
-from .security import validate_directory_path, validate_file_for_processing, SecurityError, sanitize_filename
+from .processor import ComplianceLevel, HIPAAProcessor, ProcessingResult
+from .security import (
+    SecurityError,
+    sanitize_filename,
+    validate_directory_path,
+    validate_file_for_processing,
+)
 
 
 @dataclass
 class ErrorResult:
     """Represents a failed processing result."""
-    
+
     file_path: str
     error: str
     error_type: str = "ProcessingError"
-    
+
     # Add compatibility properties for dashboard generation
     @property
     def compliance_score(self) -> float:
         """Return 0.0 for failed processing."""
         return 0.0
-    
+
     @property
     def phi_detected_count(self) -> int:
         """Return 0 for failed processing."""
@@ -80,7 +84,7 @@ class BatchProcessor:
         self._file_content_cache = {}  # Simple LRU-style cache for file contents
         self._max_cache_size = PROCESSING_CONSTANTS.DEFAULT_CACHE_SIZE  # Limit cache to prevent memory issues
         self.performance_monitor = performance_monitor
-        
+
         # Set up processor with monitoring if available
         if performance_monitor and hasattr(self.processor, 'phi_redactor'):
             self.processor.phi_redactor.performance_monitor = performance_monitor
@@ -88,26 +92,26 @@ class BatchProcessor:
     def _optimized_file_read(self, file_path: Path) -> str:
         """Optimized file reading with caching and memory mapping for large files."""
         file_key = str(file_path)
-        
+
         # Check cache first
         if file_key in self._file_content_cache:
             return self._file_content_cache[file_key]
-        
+
         file_size = file_path.stat().st_size
-        
+
         # For small files (< 1MB), use regular read with caching
         if file_size < PROCESSING_CONSTANTS.LARGE_FILE_THRESHOLD:
             content = file_path.read_text(encoding='utf-8', errors='ignore')
-            
+
             # Manage cache size
             if len(self._file_content_cache) >= self._max_cache_size:
                 # Remove oldest entry (simple FIFO)
                 oldest_key = next(iter(self._file_content_cache))
                 del self._file_content_cache[oldest_key]
-            
+
             self._file_content_cache[file_key] = content
             return content
-        
+
         # For large files (>= 1MB), use memory mapping
         try:
             with open(file_path, 'rb') as f:
@@ -126,7 +130,7 @@ class BatchProcessor:
     def _preload_files(self, files: List[Path]) -> None:
         """Preload small files into cache to reduce I/O during processing."""
         small_files = [f for f in files if f.stat().st_size < PROCESSING_CONSTANTS.SMALL_FILE_THRESHOLD]
-        
+
         if small_files:
             logger.info("Preloading %d small files into cache", len(small_files))
             for file_path in small_files[:self._max_cache_size]:
@@ -161,40 +165,40 @@ class BatchProcessor:
         # Validate parameters and setup
         max_workers = self._validate_and_setup_workers(max_workers)
         self._validate_compliance_level(compliance_level)
-        
+
         # Validate input directory
         in_path = self._validate_input_directory(input_dir)
-        
+
         # Setup output directory
         out_path = self._setup_output_directory(output_dir)
-        
+
         # Collect files to process
         files = self._collect_files_to_process(in_path)
         if not files:
             logger.warning("No files found in input directory: %s", input_dir)
             return []
-        
+
         # Optimize processing order and workers
         files, max_workers = self._optimize_processing_setup(files, max_workers)
-        
+
         logger.info("Processing %d files with %d workers", len(files), max_workers)
-        
+
         # Process files and return results
         return self._execute_file_processing(
             files, out_path, generate_summaries, show_progress, max_workers
         )
-    
+
     def _validate_and_setup_workers(self, max_workers: Optional[int]) -> int:
         """Validate and setup optimal worker count."""
         if max_workers is None:
             max_workers = min(PROCESSING_CONSTANTS.DEFAULT_WORKERS, max(1, multiprocessing.cpu_count() - 1))
             logger.info("Auto-detected optimal workers: %d", max_workers)
-        
+
         if max_workers <= 0:
             raise ValueError("max_workers must be positive")
-        
+
         return max_workers
-    
+
     def _validate_compliance_level(self, compliance_level: Optional[str]) -> None:
         """Validate and set compliance level."""
         if compliance_level is not None:
@@ -202,7 +206,7 @@ class BatchProcessor:
                 self.processor.compliance_level = ComplianceLevel(compliance_level)
             except ValueError as e:
                 raise ValueError(f"Invalid compliance level: {e}")
-    
+
     def _validate_input_directory(self, input_dir: str) -> Path:
         """Validate input directory with security checks."""
         try:
@@ -219,25 +223,25 @@ class BatchProcessor:
                 raise ValueError(f"Security validation failed for input directory: {e}")
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Permission denied accessing input directory: {e}")
-    
+
     def _setup_output_directory(self, output_dir: Optional[str]) -> Optional[Path]:
         """Setup output directory with security validation."""
         if not output_dir:
             return None
-            
+
         try:
             # Validate the parent directory path for security
             output_parent = str(Path(output_dir).parent)
             if output_parent != '.':
                 validate_directory_path(output_parent)
-            
+
             out_path = Path(output_dir)
             out_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Validate the created directory
             validate_directory_path(str(out_path))
             return out_path
-            
+
         except SecurityError as e:
             # Only reject truly dangerous paths, allow reasonable directories to be created
             if "dangerous path pattern" in str(e):
@@ -247,42 +251,42 @@ class BatchProcessor:
             return Path(output_dir)
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Cannot create output directory: {e}")
-    
+
     def _collect_files_to_process(self, in_path: Path) -> List[Path]:
         """Collect list of files to process from input directory with validation."""
         try:
             files = [f for f in in_path.iterdir() if f.is_file()]
         except (OSError, PermissionError) as e:
             raise PermissionError(f"Permission denied accessing input directory: {e}")
-        
+
         # File count validation
         max_files = PERFORMANCE_LIMITS.MAX_CONCURRENT_JOBS * 1000  # Reasonable limit
         if len(files) > max_files:
             raise ValueError(f"Too many files to process: {len(files)} (max {max_files}). Consider using batch processing in smaller chunks.")
-        
+
         if len(files) == 0:
             logger.warning("No files found in directory: %s", in_path)
         else:
             logger.info("Found %d files to process", len(files))
-        
+
         return files
-    
+
     def _optimize_processing_setup(self, files: List[Path], max_workers: int) -> tuple[List[Path], int]:
         """Optimize file processing order and worker count."""
         # Sort files by size for better processing order (small files first)
         files.sort(key=lambda f: f.stat().st_size)
-        
+
         # Preload small files into cache for faster access
         self._preload_files(files)
-        
+
         # Adaptive worker scaling based on file count
         total = len(files)
         if total < max_workers:
             max_workers = max(1, total)
             logger.info("Reducing workers to %d for %d files", max_workers, total)
-        
+
         return files, max_workers
-    
+
     def _execute_file_processing(
         self,
         files: List[Path],
@@ -295,38 +299,38 @@ class BatchProcessor:
         results: List[Union[ProcessingResult, ErrorResult]] = []
         total = len(files)
         processed = 0
-        
+
         # Start batch-level memory monitoring
         batch_id = f"batch_{total}_files"
         if self.performance_monitor:
             self.performance_monitor.start_document_processing(batch_id)
             logger.debug("Started batch memory monitoring for %d files", total)
-        
+
         try:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks and track futures
                 future_to_file = {
-                    executor.submit(self._process_file_with_monitoring, file, out_path, generate_summaries): file 
+                    executor.submit(self._process_file_with_monitoring, file, out_path, generate_summaries): file
                     for file in files
                 }
-                
+
                 for future in as_completed(future_to_file):
                     file = future_to_file[future]
                     try:
                         result = future.result()
                         results.append(result)
                         processed += 1
-                        
+
                         # Periodic memory monitoring during batch processing
                         if self.performance_monitor and processed % PROCESSING_CONSTANTS.PROGRESS_REPORT_INTERVAL == 0:
                             system_metrics = self.performance_monitor.get_system_metrics()
-                            logger.debug("Batch progress %d/%d - Memory usage: %.1f MB", 
+                            logger.debug("Batch progress %d/%d - Memory usage: %.1f MB",
                                        processed, total, system_metrics.memory_usage)
-                        
+
                         if show_progress:
                             status = "✓" if isinstance(result, ProcessingResult) else "✗"
                             logger.info(f"[{processed}/{total}] {status} {file.name}")
-                            
+
                     except Exception as e:
                         # Handle exceptions from the future
                         error_result = ErrorResult(
@@ -336,10 +340,10 @@ class BatchProcessor:
                         )
                         results.append(error_result)
                         processed += 1
-                        
+
                         if show_progress:
                             logger.info(f"[{processed}/{total}] ✗ {file.name}")
-                            
+
         except Exception as e:
             # End batch monitoring on exception
             if self.performance_monitor:
@@ -347,36 +351,36 @@ class BatchProcessor:
                     batch_id, success=False, error=str(e)
                 )
             raise RuntimeError(f"Thread pool execution failed: {e}")
-        
+
         # End batch monitoring on success
         if self.performance_monitor:
             final_metrics = self.performance_monitor.get_system_metrics()
             self.performance_monitor.end_document_processing(
                 batch_id, success=True, result=None
             )
-            logger.info("Batch completed - Final memory usage: %.1f MB, Peak: %.1f MB", 
+            logger.info("Batch completed - Final memory usage: %.1f MB, Peak: %.1f MB",
                        final_metrics.memory_usage, final_metrics.memory_peak)
-        
+
         # Log summary
         self._log_processing_summary(results)
         return results
-    
+
     def _process_file_with_monitoring(
-        self, 
-        file: Path, 
-        out_path: Optional[Path], 
+        self,
+        file: Path,
+        out_path: Optional[Path],
         generate_summaries: bool
     ) -> Union[ProcessingResult, ErrorResult]:
         """Process a single file with comprehensive monitoring and error handling."""
         document_id = str(file)
-        
+
         # Start performance monitoring
         if self.performance_monitor:
             self.performance_monitor.start_document_processing(document_id)
-        
+
         try:
             logger.info("Processing file %s", file)
-            
+
             # Security validation first
             try:
                 validated_file = validate_file_for_processing(str(file))
@@ -384,7 +388,7 @@ class BatchProcessor:
                 return self._create_error_result(
                     file, f"Security validation failed: {e}", "SecurityError", document_id
                 )
-            
+
             # Detect document type
             try:
                 doc_type = detect_document_type(validated_file.name)
@@ -392,12 +396,12 @@ class BatchProcessor:
                 return self._create_error_result(
                     file, f"Failed to detect document type: {e}", "DocumentTypeError", document_id
                 )
-            
+
             # Create document object and process
             try:
                 doc = Document(str(validated_file), doc_type)
                 result = self.processor.process_document(doc)
-            except (IOError, OSError) as e:
+            except OSError as e:
                 return self._create_error_result(
                     file, f"File read error: {e}", "FileReadError", document_id
                 )
@@ -409,35 +413,35 @@ class BatchProcessor:
                 return self._create_error_result(
                     file, f"Processing error: {e}", "ProcessingError", document_id
                 )
-            
+
             # Write output files if output directory specified
             if out_path:
                 try:
                     self._write_output_files(validated_file, out_path, result, generate_summaries)
-                except (IOError, OSError, PermissionError) as e:
+                except (OSError, PermissionError) as e:
                     return self._create_error_result(
                         file, f"Cannot write file: {e}", "FileWriteError", document_id
                     )
-            
+
             # Successfully processed - record metrics
             if self.performance_monitor:
                 self.performance_monitor.end_document_processing(
                     document_id, success=True, result=result
                 )
-            
+
             return result
-            
+
         except Exception as e:
             # Catch-all for any unexpected errors
             return self._create_error_result(
                 file, f"Unexpected error: {e}", "UnexpectedError", document_id
             )
-    
+
     def _create_error_result(
-        self, 
-        file: Path, 
-        error_msg: str, 
-        error_type: str, 
+        self,
+        file: Path,
+        error_msg: str,
+        error_type: str,
         document_id: str
     ) -> ErrorResult:
         """Create an error result and handle performance monitoring."""
@@ -446,46 +450,46 @@ class BatchProcessor:
             error=error_msg,
             error_type=error_type
         )
-        
+
         if self.performance_monitor:
             self.performance_monitor.end_document_processing(
                 document_id, success=False, error=error_result.error
             )
-        
+
         return error_result
-    
+
     def _write_output_files(
-        self, 
-        validated_file: Path, 
-        out_path: Path, 
-        result: ProcessingResult, 
+        self,
+        validated_file: Path,
+        out_path: Path,
+        result: ProcessingResult,
         generate_summaries: bool
     ) -> None:
         """Write output files to the specified directory."""
         # Sanitize filename for security
         safe_filename = sanitize_filename(validated_file.name)
         out_file = out_path / safe_filename
-        
+
         # Ensure we don't overwrite existing files
         counter = 1
         while out_file.exists():
             name, ext = os.path.splitext(safe_filename)
             out_file = out_path / f"{name}_{counter}{ext}"
             counter += 1
-        
+
         out_file.write_text(result.redacted.text)
-        
+
         if generate_summaries:
             summary_file = out_file.with_suffix(out_file.suffix + ".summary.txt")
             summary_file.write_text(result.summary)
-    
+
     def _log_processing_summary(self, results: List[Union[ProcessingResult, ErrorResult]]) -> None:
         """Log summary of processing results."""
         successful_count = sum(1 for r in results if isinstance(r, ProcessingResult))
         error_count = len(results) - successful_count
-        
+
         if error_count > 0:
-            logger.warning("Processed %d files: %d successful, %d errors", 
+            logger.warning("Processed %d files: %d successful, %d errors",
                          len(results), successful_count, error_count)
         else:
             logger.info("Successfully processed %d files", successful_count)
@@ -498,13 +502,13 @@ class BatchProcessor:
             total_score = 0.0
             total_phi = 0
             valid_results = 0
-            
+
             for r in results:
                 try:
                     # Use safe attribute access
                     score = getattr(r, 'compliance_score', 0.0)
                     phi_count = getattr(r, 'phi_detected_count', 0)
-                    
+
                     if score is not None and phi_count is not None:
                         total_score += float(score)
                         total_phi += int(phi_count)
@@ -512,12 +516,12 @@ class BatchProcessor:
                 except (ValueError, TypeError, AttributeError):
                     # Skip invalid results
                     continue
-            
+
             avg_score = total_score / valid_results if valid_results > 0 else 1.0
         else:
             avg_score = 1.0
             total_phi = 0
-            
+
         return BatchDashboard(
             documents_processed=len(results),
             avg_compliance_score=round(avg_score, 2),
@@ -528,20 +532,20 @@ class BatchProcessor:
         """Write a dashboard summary for ``results`` to ``path`` as JSON."""
         # Convert to string for validation
         path_str = str(path)
-        
+
         # Validate file path
         if not path_str or '\x00' in path_str:
             raise ValueError(f"Invalid file path: {path}")
-        
+
         try:
             dash = self.generate_dashboard(results)
             dashboard_json = dash.to_json()
-            
+
             # Write with proper error handling
             dashboard_path = Path(path_str)
             dashboard_path.write_text(dashboard_json)
             logger.info("Dashboard saved to %s", path_str)
-            
+
         except PermissionError as e:
             raise PermissionError(f"Cannot write dashboard to {path_str}: {e}")
         except OSError as e:
@@ -551,22 +555,22 @@ class BatchProcessor:
                 raise OSError(f"Failed to write dashboard to {path_str}: {e}")
         except Exception as e:
             raise RuntimeError(f"Unexpected error saving dashboard to {path_str}: {e}")
-    
+
     def generate_performance_dashboard(self) -> Optional[Dict]:
         """Generate enhanced performance dashboard with monitoring data."""
         if not self.performance_monitor:
             return None
-        
+
         from .monitoring import MonitoringDashboard
         dashboard = MonitoringDashboard(self.performance_monitor)
         return dashboard.generate_dashboard_data()
-    
+
     def save_performance_dashboard(self, path: Union[str, Path]) -> None:
         """Save enhanced performance dashboard to JSON file."""
         if not self.performance_monitor:
             logger.warning("No performance monitor available - cannot save performance dashboard")
             return
-        
+
         dashboard_data = self.generate_performance_dashboard()
         if dashboard_data:
             path_str = str(path)
@@ -604,25 +608,25 @@ class BatchProcessor:
                     "error": error_msg
                 }
             }
-        
+
         try:
             # Calculate cache hit ratios with safe attribute access
             pattern_cache = cache_info.get("pattern_compilation")
             phi_cache = cache_info.get("phi_detection")
-            
+
             def safe_cache_metrics(cache_obj):
                 """Safely extract cache metrics."""
                 if cache_obj is None:
                     return {"hits": 0, "misses": 0, "hit_ratio": 0.0, "current_size": 0, "max_size": 0}
-                
+
                 try:
                     hits = getattr(cache_obj, 'hits', 0)
                     misses = getattr(cache_obj, 'misses', 0)
                     current_size = getattr(cache_obj, 'currsize', 0)
                     max_size = getattr(cache_obj, 'maxsize', 0)
-                    
+
                     hit_ratio = hits / (hits + misses) if (hits + misses) > 0 else 0.0
-                    
+
                     return {
                         "hits": int(hits),
                         "misses": int(misses),
@@ -633,12 +637,12 @@ class BatchProcessor:
                 except (ValueError, TypeError, AttributeError) as e:
                     logger.warning(f"Failed to parse cache metrics: {e}")
                     return {"error": str(e), "hits": 0, "misses": 0, "hit_ratio": 0.0, "current_size": 0, "max_size": 0}
-            
+
             return {
                 "pattern_compilation": safe_cache_metrics(pattern_cache),
                 "phi_detection": safe_cache_metrics(phi_cache)
             }
-            
+
         except Exception as e:
             logger.warning("Error calculating cache performance: %s", e)
             # Return error information with safe defaults
@@ -659,15 +663,15 @@ class BatchProcessor:
                     "max_size": 0
                 }
             }
-    
+
     def get_memory_stats(self) -> dict:
         """Get current memory usage statistics for batch processing."""
         if not self.performance_monitor:
             return {"error": "No performance monitor available"}
-        
+
         try:
             system_metrics = self.performance_monitor.get_system_metrics()
-            
+
             return {
                 "current_memory_mb": system_metrics.memory_usage,
                 "peak_memory_mb": system_metrics.memory_peak,

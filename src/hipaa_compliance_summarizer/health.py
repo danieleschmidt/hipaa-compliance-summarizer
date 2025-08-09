@@ -1,12 +1,12 @@
 """Health check and monitoring endpoints for HIPAA Compliance Summarizer."""
 
-import json
 import time
 from datetime import datetime
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Any, Dict
+
 import psutil
 import yaml
-from pathlib import Path
 
 
 class HealthChecker:
@@ -46,7 +46,7 @@ class HealthChecker:
         """Check configuration file validity."""
         try:
             if Path(self.config_path).exists():
-                with open(self.config_path, "r") as f:
+                with open(self.config_path) as f:
                     yaml.safe_load(f)
                 return {"status": "healthy", "config_loaded": True}
             else:

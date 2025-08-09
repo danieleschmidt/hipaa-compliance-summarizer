@@ -1,14 +1,14 @@
 """PHI Entity models for HIPAA compliance tracking."""
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import Optional, Dict, Any
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, Optional
 
 
 class PHICategory(str, Enum):
     """HIPAA Safe Harbor PHI categories."""
-    
+
     # Direct identifiers (18 categories per HIPAA Safe Harbor rule)
     NAMES = "names"
     GEOGRAPHIC_SUBDIVISIONS = "geographic_subdivisions"
@@ -32,7 +32,7 @@ class PHICategory(str, Enum):
 
 class RedactionMethod(str, Enum):
     """Methods used for PHI redaction."""
-    
+
     REMOVAL = "removal"          # Complete removal of PHI
     MASKING = "masking"          # Replace with asterisks or placeholders
     SYNTHETIC = "synthetic"      # Replace with synthetic but realistic data
@@ -43,47 +43,47 @@ class RedactionMethod(str, Enum):
 @dataclass
 class PHIEntity:
     """Represents a detected PHI entity with full metadata."""
-    
+
     # Core identification
     entity_id: str
     category: PHICategory
     value: str
     confidence_score: float
-    
+
     # Location within document
     start_position: int
     end_position: int
     line_number: Optional[int] = None
-    
+
     # Processing metadata
     detection_method: str = "pattern_matching"  # pattern_matching, ml_model, manual
     redaction_method: RedactionMethod = RedactionMethod.MASKING
     redacted_value: Optional[str] = None
-    
+
     # Compliance tracking
     risk_level: str = "medium"  # low, medium, high, critical
     requires_audit: bool = True
     compliance_notes: Optional[str] = None
-    
+
     # Timestamps
     detected_at: datetime = None
     processed_at: Optional[datetime] = None
-    
+
     def __post_init__(self):
         """Set default timestamps and validate data."""
         if self.detected_at is None:
             self.detected_at = datetime.utcnow()
-        
+
         # Validate confidence score
         if not 0.0 <= self.confidence_score <= 1.0:
             raise ValueError(f"Confidence score must be between 0.0 and 1.0, got {self.confidence_score}")
-        
+
         # Validate positions
         if self.start_position < 0 or self.end_position < 0:
             raise ValueError("Positions must be non-negative")
         if self.start_position >= self.end_position:
             raise ValueError("Start position must be less than end position")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -103,18 +103,18 @@ class PHIEntity:
             "detected_at": self.detected_at.isoformat() if self.detected_at else None,
             "processed_at": self.processed_at.isoformat() if self.processed_at else None,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "PHIEntity":
         """Create PHIEntity from dictionary."""
         # Convert string enums back to enum instances
         category = PHICategory(data["category"])
         redaction_method = RedactionMethod(data["redaction_method"])
-        
+
         # Parse timestamps
         detected_at = datetime.fromisoformat(data["detected_at"]) if data.get("detected_at") else None
         processed_at = datetime.fromisoformat(data["processed_at"]) if data.get("processed_at") else None
-        
+
         return cls(
             entity_id=data["entity_id"],
             category=category,
@@ -132,7 +132,7 @@ class PHIEntity:
             detected_at=detected_at,
             processed_at=processed_at,
         )
-    
+
     def calculate_risk_score(self) -> float:
         """Calculate numerical risk score based on category and confidence."""
         # Base risk scores by category
@@ -150,14 +150,14 @@ class PHIEntity:
             PHICategory.WEB_URLS: 0.3,
             PHICategory.GEOGRAPHIC_SUBDIVISIONS: 0.4,
         }
-        
+
         base_risk = category_risk.get(self.category, 0.5)  # Default medium risk
-        
+
         # Adjust by confidence score - higher confidence = higher risk
         confidence_multiplier = 0.5 + (self.confidence_score * 0.5)
-        
+
         return min(1.0, base_risk * confidence_multiplier)
-    
+
     def needs_special_handling(self) -> bool:
         """Determine if this entity requires special compliance handling."""
         high_risk_categories = {
@@ -166,9 +166,9 @@ class PHIEntity:
             PHICategory.BIOMETRIC_IDENTIFIERS,
             PHICategory.FULL_FACE_PHOTOS,
         }
-        
+
         return (
-            self.category in high_risk_categories or 
+            self.category in high_risk_categories or
             self.confidence_score >= 0.95 or
             self.risk_level in ["high", "critical"]
         )

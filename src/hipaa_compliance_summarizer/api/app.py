@@ -1,20 +1,25 @@
 """FastAPI application factory for HIPAA compliance API."""
 
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 
-from .routes import api_blueprint
-from .middleware import auth_middleware, audit_middleware, rate_limit_middleware, security_headers_middleware
-from ..database import initialize_database, get_db_connection
+from ..database import get_db_connection, initialize_database
 from ..monitoring import setup_metrics_middleware
+from .middleware import (
+    audit_middleware,
+    auth_middleware,
+    rate_limit_middleware,
+    security_headers_middleware,
+)
+from .routes import api_blueprint
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     # Startup
     logger.info("Starting HIPAA Compliance API...")
-    
+
     # Initialize database
     try:
         db = initialize_database()
@@ -36,18 +41,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
-    
+
     # Initialize monitoring
     try:
         setup_metrics_middleware(app)
         logger.info("Monitoring initialized")
     except Exception as e:
         logger.warning(f"Monitoring setup failed: {e}")
-    
+
     logger.info("HIPAA Compliance API started successfully")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down HIPAA Compliance API...")
     logger.info("HIPAA Compliance API shutdown complete")
@@ -65,7 +70,7 @@ def create_app(config: dict = None) -> FastAPI:
     # Application configuration
     app_config = config or {}
     debug_mode = app_config.get("debug", os.getenv("DEBUG", "false").lower() == "true")
-    
+
     # Create FastAPI app
     app = FastAPI(
         title="HIPAA Compliance Summarizer API",
@@ -77,19 +82,19 @@ def create_app(config: dict = None) -> FastAPI:
         redoc_url="/redoc" if debug_mode else None,
         openapi_url="/openapi.json" if debug_mode else None,
     )
-    
+
     # Security middleware
     setup_security_middleware(app, app_config)
-    
+
     # CORS middleware
     setup_cors_middleware(app, app_config)
-    
+
     # Custom middleware
     setup_custom_middleware(app)
-    
+
     # Include API routes
     app.include_router(api_blueprint, prefix="/api/v1")
-    
+
     # Health check endpoint
     @app.get("/health", include_in_schema=False)
     async def health_check():
@@ -98,7 +103,7 @@ def create_app(config: dict = None) -> FastAPI:
             # Test database connection
             db = get_db_connection()
             db_healthy = db.test_connection()
-            
+
             return {
                 "status": "healthy" if db_healthy else "unhealthy",
                 "database": "connected" if db_healthy else "disconnected",
@@ -114,19 +119,19 @@ def create_app(config: dict = None) -> FastAPI:
                     "version": "1.2.0"
                 }
             )
-    
+
     # Metrics endpoint
     @app.get("/metrics", include_in_schema=False)
     async def metrics():
         """Prometheus metrics endpoint."""
         # In production, this would return Prometheus-formatted metrics
         return {"metrics": "placeholder"}
-    
+
     # Custom OpenAPI schema
     def custom_openapi():
         if app.openapi_schema:
             return app.openapi_schema
-        
+
         openapi_schema = get_openapi(
             title="HIPAA Compliance Summarizer API",
             version="1.2.0",
@@ -174,7 +179,7 @@ For technical support or compliance questions:
             """,
             routes=app.routes,
         )
-        
+
         # Add security schemes
         openapi_schema["components"]["securitySchemes"] = {
             "BearerAuth": {
@@ -184,18 +189,18 @@ For technical support or compliance questions:
                 "description": "API key authentication"
             }
         }
-        
+
         # Apply security to all endpoints
         for path in openapi_schema["paths"]:
             for method in openapi_schema["paths"][path]:
                 if method != "options":
                     openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-        
+
         app.openapi_schema = openapi_schema
         return app.openapi_schema
-    
+
     app.openapi = custom_openapi
-    
+
     return app
 
 
@@ -206,12 +211,12 @@ def setup_security_middleware(app: FastAPI, config: dict):
     if os.getenv("ENVIRONMENT") == "production":
         # In production, be more restrictive
         allowed_hosts = config.get("production_hosts", ["api.hipaa-summarizer.com"])
-    
+
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=allowed_hosts
     )
-    
+
     # Security headers
     app.middleware("http")(security_headers_middleware)
 
@@ -219,7 +224,7 @@ def setup_security_middleware(app: FastAPI, config: dict):
 def setup_cors_middleware(app: FastAPI, config: dict):
     """Setup CORS middleware."""
     cors_origins = config.get("cors_origins", [])
-    
+
     # Default origins for development
     if not cors_origins and os.getenv("ENVIRONMENT") != "production":
         cors_origins = [
@@ -228,7 +233,7 @@ def setup_cors_middleware(app: FastAPI, config: dict):
             "http://127.0.0.1:3000",
             "http://127.0.0.1:8000",
         ]
-    
+
     if cors_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -244,9 +249,9 @@ def setup_custom_middleware(app: FastAPI):
     """Setup custom middleware."""
     # Rate limiting
     app.middleware("http")(rate_limit_middleware)
-    
+
     # Authentication
     app.middleware("http")(auth_middleware)
-    
+
     # Audit logging
     app.middleware("http")(audit_middleware)

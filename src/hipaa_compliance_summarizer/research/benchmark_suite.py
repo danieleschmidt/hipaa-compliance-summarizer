@@ -11,18 +11,19 @@ Comprehensive benchmarking framework for comparative analysis of PHI detection a
 
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Callable
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 
-from .statistical_validation import StatisticalValidator, ValidationMetrics
 from .adaptive_phi_detection import AdaptivePHIDetector
+from .statistical_validation import StatisticalValidator, ValidationMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BenchmarkDataset:
     """Standardized dataset for PHI detection benchmarking."""
-    
+
     name: str
     description: str
     documents: List[str]
@@ -38,17 +39,17 @@ class BenchmarkDataset:
     document_types: List[str]
     difficulty_level: str  # "easy", "medium", "hard", "mixed"
     domain: str  # "clinical", "administrative", "research", "mixed"
-    
+
     @property
     def size(self) -> int:
         """Number of documents in dataset."""
         return len(self.documents)
-    
+
     @property
     def total_phi_entities(self) -> int:
         """Total number of PHI entities across all documents."""
         return sum(len(doc_annotations) for doc_annotations in self.ground_truth)
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get dataset statistics."""
         return {
@@ -65,20 +66,20 @@ class BenchmarkDataset:
 @dataclass
 class BenchmarkResult:
     """Results from benchmarking a single model on a dataset."""
-    
+
     model_name: str
     dataset_name: str
     validation_metrics: ValidationMetrics
     performance_stats: Dict[str, float]
     processing_time: float
     memory_usage: Optional[float] = None
-    
+
     # Per-entity-type breakdown
     entity_type_metrics: Dict[str, ValidationMetrics] = field(default_factory=dict)
-    
+
     # Confidence score analysis
     confidence_distribution: Optional[Dict[str, List[float]]] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -89,26 +90,26 @@ class BenchmarkResult:
             'processing_time': self.processing_time,
             'memory_usage': self.memory_usage,
             'entity_type_metrics': {
-                entity_type: metrics.get_summary() 
+                entity_type: metrics.get_summary()
                 for entity_type, metrics in self.entity_type_metrics.items()
             },
             'confidence_distribution': self.confidence_distribution,
         }
 
 
-@dataclass 
+@dataclass
 class ComparativeAnalysis:
     """Comparative analysis results across multiple models and datasets."""
-    
+
     results: List[BenchmarkResult]
     statistical_comparisons: Dict[str, Dict[str, Any]]
     ranking: List[Tuple[str, float]]  # (model_name, overall_score)
     significance_matrix: np.ndarray
-    
+
     def get_winner(self) -> str:
         """Get the best performing model overall."""
         return self.ranking[0][0] if self.ranking else "No models compared"
-    
+
     def get_summary_table(self) -> pd.DataFrame:
         """Generate summary table of all results."""
         data = []
@@ -124,34 +125,34 @@ class ComparativeAnalysis:
                 'Processing Time (s)': result.processing_time,
                 'Memory (MB)': result.memory_usage or 0.0,
             })
-        
+
         return pd.DataFrame(data)
 
 
 class ResearchBenchmarkSuite:
     """Comprehensive benchmarking suite for HIPAA compliance research."""
-    
+
     def __init__(self, output_dir: Optional[Path] = None):
         self.output_dir = output_dir or Path("benchmark_results")
         self.output_dir.mkdir(exist_ok=True)
-        
+
         self.statistical_validator = StatisticalValidator()
         self.datasets: Dict[str, BenchmarkDataset] = {}
         self.results: List[BenchmarkResult] = []
-        
+
         # Initialize with standard datasets
         self._initialize_standard_datasets()
-    
+
     def _initialize_standard_datasets(self):
         """Initialize standard benchmark datasets."""
-        
+
         # Clinical Notes Dataset (Synthetic)
         clinical_docs = [
             "Patient John Doe, MRN 123456789, was admitted on 01/15/2024 for chest pain. Phone: 555-123-4567.",
             "Mary Smith (DOB: 03/22/1985) presented with hypertension. Contact at mary.smith@email.com.",
             "Patient ID H789012 underwent cardiac catheterization. Address: 123 Main Street, Boston, MA.",
         ]
-        
+
         clinical_ground_truth = [
             [
                 {'entity_type': 'name', 'text': 'John Doe', 'start': 8, 'end': 16},
@@ -169,7 +170,7 @@ class ResearchBenchmarkSuite:
                 {'entity_type': 'address', 'text': '123 Main Street', 'start': 58, 'end': 73},
             ],
         ]
-        
+
         self.datasets['clinical_notes'] = BenchmarkDataset(
             name='clinical_notes',
             description='Synthetic clinical notes with common PHI patterns',
@@ -179,13 +180,13 @@ class ResearchBenchmarkSuite:
             difficulty_level='medium',
             domain='clinical'
         )
-        
+
         # Insurance Forms Dataset (Synthetic)
         insurance_docs = [
             "Member ID: ABC123456, SSN: 123-45-6789, Policy effective 06/01/2024.",
             "Subscriber: Robert Johnson, DOB: 12/01/1970, DEA: BJ1234567.",
         ]
-        
+
         insurance_ground_truth = [
             [
                 {'entity_type': 'insurance_id', 'text': 'ABC123456', 'start': 11, 'end': 20},
@@ -198,7 +199,7 @@ class ResearchBenchmarkSuite:
                 {'entity_type': 'dea', 'text': 'BJ1234567', 'start': 50, 'end': 59},
             ],
         ]
-        
+
         self.datasets['insurance_forms'] = BenchmarkDataset(
             name='insurance_forms',
             description='Synthetic insurance forms with regulatory identifiers',
@@ -208,14 +209,14 @@ class ResearchBenchmarkSuite:
             difficulty_level='easy',
             domain='administrative'
         )
-        
+
         # Mixed Difficulty Dataset
         mixed_docs = [
             "Dr. Sarah Wilson (NPI: 1234567890) treated pt. on 2024-01-15. Contact: swilson@hospital.org",
             "Patient was born on January 1st, 1980. Lives at One Main St, Apt 2B, NY 10001.",
             "Prescribed 50mg daily. Follow-up in 2 weeks. Emergency contact: (555) 987-6543",
         ]
-        
+
         mixed_ground_truth = [
             [
                 {'entity_type': 'name', 'text': 'Sarah Wilson', 'start': 4, 'end': 16},
@@ -230,7 +231,7 @@ class ResearchBenchmarkSuite:
                 {'entity_type': 'phone', 'text': '(555) 987-6543', 'start': 70, 'end': 84},
             ],
         ]
-        
+
         self.datasets['mixed_difficulty'] = BenchmarkDataset(
             name='mixed_difficulty',
             description='Mixed difficulty dataset with various PHI patterns and contexts',
@@ -240,12 +241,12 @@ class ResearchBenchmarkSuite:
             difficulty_level='hard',
             domain='mixed'
         )
-    
+
     def add_dataset(self, dataset: BenchmarkDataset):
         """Add a custom dataset to the benchmark suite."""
         self.datasets[dataset.name] = dataset
         logger.info(f"Added dataset '{dataset.name}' with {dataset.size} documents")
-    
+
     def benchmark_model(
         self,
         model_callable: Callable[[str, str], List[Dict]],
@@ -267,26 +268,26 @@ class ResearchBenchmarkSuite:
         """
         if dataset_names is None:
             dataset_names = list(self.datasets.keys())
-        
+
         results = []
-        
+
         for dataset_name in dataset_names:
             if dataset_name not in self.datasets:
                 logger.warning(f"Dataset '{dataset_name}' not found, skipping")
                 continue
-            
+
             dataset = self.datasets[dataset_name]
             logger.info(f"Benchmarking {model_name} on {dataset_name}")
-            
+
             result = self._benchmark_single_dataset(
                 model_callable, model_name, dataset, enable_memory_profiling
             )
-            
+
             results.append(result)
             self.results.append(result)
-        
+
         return results
-    
+
     def _benchmark_single_dataset(
         self,
         model_callable: Callable[[str, str], List[Dict]],
@@ -295,60 +296,60 @@ class ResearchBenchmarkSuite:
         enable_memory_profiling: bool
     ) -> BenchmarkResult:
         """Benchmark model on a single dataset."""
-        
+
         start_time = time.time()
         memory_usage = None
-        
+
         # Track memory usage if requested
         if enable_memory_profiling:
             import psutil
             process = psutil.Process()
             memory_before = process.memory_info().rss / 1024 / 1024  # MB
-        
+
         # Run model on all documents
         all_predictions = []
         all_ground_truth = []
         all_confidence_scores = []
         entity_type_predictions = defaultdict(list)
         entity_type_ground_truth = defaultdict(list)
-        
+
         for doc_idx, (document, doc_ground_truth, doc_type) in enumerate(
             zip(dataset.documents, dataset.ground_truth, dataset.document_types)
         ):
             try:
                 # Get model predictions
                 predictions = model_callable(document, doc_type)
-                
+
                 # Convert to binary classification format
                 doc_predictions, doc_gt, confidence_scores = self._align_predictions_with_ground_truth(
                     predictions, doc_ground_truth, document
                 )
-                
+
                 all_predictions.extend(doc_predictions)
                 all_ground_truth.extend(doc_gt)
                 all_confidence_scores.extend(confidence_scores)
-                
+
                 # Track by entity type
                 for pred, gt, conf, entity_type in zip(doc_predictions, doc_gt, confidence_scores, [p.get('entity_type', 'unknown') for p in predictions]):
                     entity_type_predictions[entity_type].append(pred)
                     entity_type_ground_truth[entity_type].append(gt)
-                
+
             except Exception as e:
                 logger.error(f"Error processing document {doc_idx} in {dataset.name}: {e}")
                 # Continue with other documents
                 continue
-        
+
         processing_time = time.time() - start_time
-        
+
         if enable_memory_profiling:
             memory_after = process.memory_info().rss / 1024 / 1024  # MB
             memory_usage = memory_after - memory_before
-        
+
         # Validate overall performance
         overall_metrics = self.statistical_validator.validate_model_performance(
             all_predictions, all_ground_truth, all_confidence_scores
         )
-        
+
         # Calculate per-entity-type metrics
         entity_type_metrics = {}
         for entity_type in entity_type_predictions:
@@ -359,7 +360,7 @@ class ResearchBenchmarkSuite:
                     hypothesis_test=False  # Skip for individual types
                 )
                 entity_type_metrics[entity_type] = entity_metrics
-        
+
         # Performance statistics
         performance_stats = {
             'documents_processed': len(dataset.documents),
@@ -367,7 +368,7 @@ class ResearchBenchmarkSuite:
             'documents_per_second': len(dataset.documents) / max(processing_time, 0.001),
             'predictions_per_second': len(all_predictions) / max(processing_time, 0.001),
         }
-        
+
         # Confidence distribution analysis
         confidence_distribution = None
         if all_confidence_scores and len(all_confidence_scores) > 0:
@@ -381,7 +382,7 @@ class ResearchBenchmarkSuite:
                     'p95': float(np.percentile(all_confidence_scores, 95)),
                 }
             }
-        
+
         return BenchmarkResult(
             model_name=model_name,
             dataset_name=dataset.name,
@@ -392,7 +393,7 @@ class ResearchBenchmarkSuite:
             entity_type_metrics=entity_type_metrics,
             confidence_distribution=confidence_distribution
         )
-    
+
     def _align_predictions_with_ground_truth(
         self,
         predictions: List[Dict],
@@ -409,27 +410,27 @@ class ResearchBenchmarkSuite:
         pred_spans = set()
         gt_spans = set()
         confidence_scores = []
-        
+
         for pred in predictions:
             span = (pred.get('start', 0), pred.get('end', 0), pred.get('entity_type', ''))
             pred_spans.add(span)
             confidence_scores.append(pred.get('confidence', 0.5))
-        
+
         for gt in ground_truth:
             span = (gt.get('start', 0), gt.get('end', 0), gt.get('entity_type', ''))
             gt_spans.add(span)
-        
+
         # For simplicity, treat each unique span as a binary classification
         all_spans = pred_spans.union(gt_spans)
-        
+
         predictions_binary = []
         ground_truth_binary = []
         aligned_confidence = []
-        
+
         for span in all_spans:
             predictions_binary.append(span in pred_spans)
             ground_truth_binary.append(span in gt_spans)
-            
+
             # Find confidence for this span
             conf = 0.5  # Default
             for pred in predictions:
@@ -437,90 +438,90 @@ class ResearchBenchmarkSuite:
                     conf = pred.get('confidence', 0.5)
                     break
             aligned_confidence.append(conf)
-        
+
         return predictions_binary, ground_truth_binary, aligned_confidence
-    
+
     def compare_models(
         self,
         results_subset: Optional[List[BenchmarkResult]] = None
     ) -> ComparativeAnalysis:
         """Compare multiple models across datasets with statistical testing."""
-        
+
         if results_subset is None:
             results_to_compare = self.results
         else:
             results_to_compare = results_subset
-        
+
         if len(results_to_compare) < 2:
             raise ValueError("Need at least 2 benchmark results to compare")
-        
+
         # Group results by dataset for pairwise comparisons
         dataset_results = defaultdict(list)
         for result in results_to_compare:
             dataset_results[result.dataset_name].append(result)
-        
+
         # Perform statistical comparisons
         statistical_comparisons = {}
-        
+
         for dataset_name, dataset_results_list in dataset_results.items():
             if len(dataset_results_list) < 2:
                 continue
-            
+
             # Pairwise comparisons for this dataset
             comparisons = {}
             for i, result1 in enumerate(dataset_results_list):
                 for j, result2 in enumerate(dataset_results_list[i+1:], i+1):
                     comparison_key = f"{result1.model_name}_vs_{result2.model_name}"
-                    
+
                     # We would need access to the raw predictions for McNemar's test
                     # For now, provide a simplified comparison
                     f1_diff = result2.validation_metrics.f1_score - result1.validation_metrics.f1_score
                     accuracy_diff = result2.validation_metrics.accuracy - result1.validation_metrics.accuracy
-                    
+
                     comparisons[comparison_key] = {
                         'f1_difference': f1_diff,
                         'accuracy_difference': accuracy_diff,
                         'model1_better': f1_diff < 0,
                         'effect_size': abs(f1_diff),
                     }
-            
+
             statistical_comparisons[dataset_name] = comparisons
-        
+
         # Create overall ranking based on average F1 score
         model_scores = defaultdict(list)
         for result in results_to_compare:
             model_scores[result.model_name].append(result.validation_metrics.f1_score)
-        
+
         # Calculate average scores
         model_avg_scores = {
             model: np.mean(scores) for model, scores in model_scores.items()
         }
-        
+
         ranking = sorted(model_avg_scores.items(), key=lambda x: x[1], reverse=True)
-        
+
         # Create significance matrix (placeholder - would need raw predictions for real test)
         unique_models = list(model_avg_scores.keys())
         significance_matrix = np.eye(len(unique_models))  # Identity matrix as placeholder
-        
+
         return ComparativeAnalysis(
             results=results_to_compare,
             statistical_comparisons=statistical_comparisons,
             ranking=ranking,
             significance_matrix=significance_matrix
         )
-    
+
     def generate_research_report(
         self,
         comparative_analysis: ComparativeAnalysis,
         output_filename: str = "research_benchmark_report.md"
     ) -> str:
         """Generate comprehensive research report suitable for academic publication."""
-        
+
         report_path = self.output_dir / output_filename
-        
+
         # Create summary table
         summary_df = comparative_analysis.get_summary_table()
-        
+
         # Generate report content
         report_content = f"""
 # PHI Detection Algorithm Benchmark Report
@@ -535,7 +536,7 @@ This report presents a comprehensive evaluation of {len(set(r.model_name for r i
 
 ### Datasets
 """
-        
+
         for dataset_name, dataset in self.datasets.items():
             stats = dataset.get_statistics()
             report_content += f"""
@@ -547,7 +548,7 @@ This report presents a comprehensive evaluation of {len(set(r.model_name for r i
 - **Difficulty**: {stats['difficulty_level'].title()}
 - **Domain**: {stats['domain'].title()}
 """
-        
+
         report_content += """
 ### Evaluation Metrics
 
@@ -564,16 +565,16 @@ Statistical significance was assessed using appropriate hypothesis tests with α
 ### Overall Performance Summary
 
 """
-        
+
         # Add summary table
         report_content += summary_df.to_markdown(index=False)
-        
+
         report_content += """
 
 ### Statistical Significance
 
 """
-        
+
         # Add statistical comparisons
         for dataset_name, comparisons in comparative_analysis.statistical_comparisons.items():
             report_content += f"\n#### {dataset_name.title()} Dataset\n"
@@ -581,7 +582,7 @@ Statistical significance was assessed using appropriate hypothesis tests with α
                 models = comparison.split('_vs_')
                 better_model = models[1] if stats['f1_difference'] > 0 else models[0]
                 report_content += f"- **{comparison.replace('_', ' ')}**: {better_model} performs better (F1 difference: {abs(stats['f1_difference']):.3f})\n"
-        
+
         report_content += """
 
 ### Model Rankings
@@ -589,10 +590,10 @@ Statistical significance was assessed using appropriate hypothesis tests with α
 Based on average F1 score across all datasets:
 
 """
-        
+
         for rank, (model_name, score) in enumerate(comparative_analysis.ranking, 1):
             report_content += f"{rank}. **{model_name}**: {score:.3f}\n"
-        
+
         report_content += """
 
 ## Discussion
@@ -630,67 +631,67 @@ HIPAA-compliant protected health information detection algorithms.
 
 *Report generated automatically by ResearchBenchmarkSuite*
 """
-        
+
         # Write report to file
         with open(report_path, 'w') as f:
             f.write(report_content)
-        
+
         logger.info(f"Research report saved to {report_path}")
-        
+
         return str(report_path)
-    
+
     def export_results(self, filename: str = "benchmark_results.json"):
         """Export all benchmark results to JSON for further analysis."""
-        
+
         export_path = self.output_dir / filename
-        
+
         export_data = {
             'benchmark_suite_version': '1.0',
             'timestamp': time.time(),
             'datasets': {name: dataset.get_statistics() for name, dataset in self.datasets.items()},
             'results': [result.to_dict() for result in self.results],
         }
-        
+
         with open(export_path, 'w') as f:
             json.dump(export_data, f, indent=2)
-        
+
         logger.info(f"Results exported to {export_path}")
         return str(export_path)
 
 
 def benchmark_adaptive_phi_detector() -> Dict[str, Any]:
     """Benchmark the adaptive PHI detector against standard datasets."""
-    
+
     # Create benchmark suite
     suite = ResearchBenchmarkSuite()
-    
+
     # Create adaptive detector
     detector = AdaptivePHIDetector(enable_statistical_validation=True)
-    
+
     # Define model callable
     def adaptive_model_callable(text: str, doc_type: str) -> List[Dict]:
         detections = detector.detect_phi_with_confidence(text, doc_type)
         return detections
-    
+
     # Run benchmark
     results = suite.benchmark_model(
         adaptive_model_callable,
         "AdaptivePHIDetector",
         enable_memory_profiling=True
     )
-    
+
     # Get performance summary
     performance_summary = detector.get_performance_summary()
-    
+
     # Generate comparative analysis (single model for demonstration)
     comparative_analysis = suite.compare_models(results)
-    
+
     # Generate research report
     report_path = suite.generate_research_report(comparative_analysis)
-    
+
     # Export results
     results_path = suite.export_results("adaptive_phi_benchmark.json")
-    
+
     return {
         'benchmark_results': results,
         'performance_summary': performance_summary,

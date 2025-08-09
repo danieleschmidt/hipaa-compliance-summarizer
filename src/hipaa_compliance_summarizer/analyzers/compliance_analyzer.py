@@ -1,11 +1,11 @@
 """HIPAA compliance analysis and scoring."""
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Set
-from dataclasses import dataclass, field
-from collections import defaultdict
 import statistics
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List
 
 from ..models.phi_entity import PHICategory
 from ..monitoring.tracing import trace_operation
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ComplianceAnalysisResult:
     """Result of HIPAA compliance analysis."""
-    
+
     document_id: str
     overall_compliance_score: float
     category_scores: Dict[str, float]
@@ -27,7 +27,7 @@ class ComplianceAnalysisResult:
     recommendations: List[str]
     metadata: Dict[str, Any] = field(default_factory=dict)
     analysis_timestamp: datetime = field(default_factory=datetime.utcnow)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -46,7 +46,7 @@ class ComplianceAnalysisResult:
 
 class ComplianceAnalyzer:
     """Analyzes HIPAA compliance and generates compliance scores."""
-    
+
     def __init__(self):
         """Initialize compliance analyzer."""
         # HIPAA Safe Harbor compliance requirements
@@ -62,7 +62,7 @@ class ComplianceAnalyzer:
             PHICategory.HEALTH_PLAN_NUMBERS.value: {"required_removal": True, "weight": 0.10},
             PHICategory.ACCOUNT_NUMBERS.value: {"required_removal": True, "weight": 0.09}
         }
-        
+
         # Violation severity levels
         self.violation_severity = {
             "critical": {"score_impact": -50, "immediate_action": True},
@@ -70,14 +70,14 @@ class ComplianceAnalyzer:
             "medium": {"score_impact": -15, "immediate_action": False},
             "low": {"score_impact": -5, "immediate_action": False}
         }
-        
+
         # Compliance thresholds
         self.compliance_thresholds = {
             "compliant": 95.0,
             "marginally_compliant": 85.0,
             "non_compliant": 0.0
         }
-        
+
         # Risk factors for different PHI categories
         self.category_risk_factors = {
             PHICategory.SOCIAL_SECURITY_NUMBERS.value: 1.0,
@@ -91,7 +91,7 @@ class ComplianceAnalyzer:
             PHICategory.GEOGRAPHIC_SUBDIVISIONS.value: 0.5,
             PHICategory.DATES.value: 0.4
         }
-    
+
     @trace_operation("compliance_analysis")
     def analyze_compliance(self, phi_entities: List[Any], document_content: str,
                           document_id: str = None, redacted_content: str = None) -> ComplianceAnalysisResult:
@@ -107,31 +107,31 @@ class ComplianceAnalyzer:
             Compliance analysis result
         """
         logger.info(f"Starting compliance analysis for document: {document_id}")
-        
+
         # Analyze PHI by category
         phi_by_category = self._categorize_phi_entities(phi_entities)
-        
+
         # Calculate category-specific compliance scores
         category_scores = self._calculate_category_scores(phi_by_category, redacted_content)
-        
+
         # Identify violations
         violations = self._identify_violations(phi_by_category, phi_entities)
-        
+
         # Calculate overall compliance score
         overall_score = self._calculate_overall_score(category_scores, violations)
-        
+
         # Determine compliance status
         compliance_status = self._determine_compliance_status(overall_score)
-        
+
         # Check Safe Harbor compliance
         safe_harbor_compliant = self._check_safe_harbor_compliance(phi_by_category, redacted_content)
-        
+
         # Perform risk assessment
         risk_assessment = self._perform_risk_assessment(phi_entities, phi_by_category, overall_score)
-        
+
         # Generate recommendations
         recommendations = self._generate_recommendations(violations, category_scores, overall_score)
-        
+
         result = ComplianceAnalysisResult(
             document_id=document_id or "unknown",
             overall_compliance_score=overall_score,
@@ -142,25 +142,25 @@ class ComplianceAnalyzer:
             risk_assessment=risk_assessment,
             recommendations=recommendations
         )
-        
+
         logger.info(f"Compliance analysis completed: {compliance_status}, score: {overall_score:.1f}")
         return result
-    
+
     def _categorize_phi_entities(self, phi_entities: List[Any]) -> Dict[str, List[Any]]:
         """Categorize PHI entities by type."""
         categorized = defaultdict(list)
-        
+
         for entity in phi_entities:
             category = getattr(entity, 'category', 'unknown')
             categorized[category].append(entity)
-        
+
         return dict(categorized)
-    
-    def _calculate_category_scores(self, phi_by_category: Dict[str, List[Any]], 
+
+    def _calculate_category_scores(self, phi_by_category: Dict[str, List[Any]],
                                  redacted_content: str = None) -> Dict[str, float]:
         """Calculate compliance scores for each PHI category."""
         category_scores = {}
-        
+
         for category, entities in phi_by_category.items():
             if category in self.safe_harbor_categories:
                 # Check if entities in this category are properly handled
@@ -170,35 +170,35 @@ class ComplianceAnalyzer:
                 else:
                     # No redacted content provided - assume not redacted
                     redaction_score = 0.0 if entities else 100.0
-                
+
                 category_scores[category] = redaction_score
             else:
                 # For categories not in Safe Harbor, assess based on presence
                 category_scores[category] = 90.0 if len(entities) <= 2 else max(50.0, 90.0 - len(entities) * 5)
-        
+
         return category_scores
-    
+
     def _verify_category_redaction(self, entities: List[Any], redacted_content: str) -> float:
         """Verify that entities are properly redacted."""
         if not entities:
             return 100.0
-        
+
         redacted_count = 0
-        
+
         for entity in entities:
             entity_text = getattr(entity, 'text', '')
             # Check if entity text appears in redacted content
             if entity_text not in redacted_content:
                 redacted_count += 1
-        
+
         redaction_rate = redacted_count / len(entities)
         return redaction_rate * 100.0
-    
-    def _identify_violations(self, phi_by_category: Dict[str, List[Any]], 
+
+    def _identify_violations(self, phi_by_category: Dict[str, List[Any]],
                            phi_entities: List[Any]) -> List[Dict[str, Any]]:
         """Identify HIPAA compliance violations."""
         violations = []
-        
+
         # Check for Safe Harbor violations
         for category, requirements in self.safe_harbor_categories.items():
             if requirements["required_removal"] and category in phi_by_category:
@@ -212,7 +212,7 @@ class ComplianceAnalyzer:
                         "entity_count": len(entities),
                         "examples": [getattr(e, 'text', '') for e in entities[:3]]  # First 3 examples
                     })
-        
+
         # Check for high-density PHI violations
         total_phi_count = len(phi_entities)
         if total_phi_count > 50:  # Threshold for high PHI density
@@ -224,17 +224,17 @@ class ComplianceAnalyzer:
                 "entity_count": total_phi_count,
                 "examples": []
             })
-        
+
         # Check for sensitive category combinations
         sensitive_combinations = self._check_sensitive_combinations(phi_by_category)
         violations.extend(sensitive_combinations)
-        
+
         return violations
-    
+
     def _determine_violation_severity(self, category: str) -> str:
         """Determine violation severity based on PHI category."""
         risk_factor = self.category_risk_factors.get(category, 0.5)
-        
+
         if risk_factor >= 0.9:
             return "critical"
         elif risk_factor >= 0.7:
@@ -243,19 +243,19 @@ class ComplianceAnalyzer:
             return "medium"
         else:
             return "low"
-    
+
     def _check_sensitive_combinations(self, phi_by_category: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
         """Check for sensitive PHI category combinations."""
         violations = []
         present_categories = set(phi_by_category.keys())
-        
+
         # Identity reconstruction risk
         identity_categories = {
             PHICategory.NAMES.value,
             PHICategory.DATES.value,
             PHICategory.GEOGRAPHIC_SUBDIVISIONS.value
         }
-        
+
         if len(identity_categories & present_categories) >= 2:
             violations.append({
                 "type": "identity_reconstruction_risk",
@@ -265,14 +265,14 @@ class ComplianceAnalyzer:
                 "entity_count": sum(len(phi_by_category[cat]) for cat in identity_categories & present_categories),
                 "examples": []
             })
-        
+
         # Financial risk combination
         financial_categories = {
             PHICategory.SOCIAL_SECURITY_NUMBERS.value,
             PHICategory.ACCOUNT_NUMBERS.value,
             PHICategory.NAMES.value
         }
-        
+
         if len(financial_categories & present_categories) >= 2:
             violations.append({
                 "type": "financial_risk_combination",
@@ -282,37 +282,37 @@ class ComplianceAnalyzer:
                 "entity_count": sum(len(phi_by_category[cat]) for cat in financial_categories & present_categories),
                 "examples": []
             })
-        
+
         return violations
-    
-    def _calculate_overall_score(self, category_scores: Dict[str, float], 
+
+    def _calculate_overall_score(self, category_scores: Dict[str, float],
                                violations: List[Dict[str, Any]]) -> float:
         """Calculate overall compliance score."""
         if not category_scores:
             return 0.0
-        
+
         # Start with weighted average of category scores
         total_weight = 0
         weighted_score = 0
-        
+
         for category, score in category_scores.items():
             weight = self.safe_harbor_categories.get(category, {}).get("weight", 0.05)
             weighted_score += score * weight
             total_weight += weight
-        
+
         if total_weight > 0:
             base_score = weighted_score / total_weight
         else:
             base_score = statistics.mean(category_scores.values())
-        
+
         # Apply violation penalties
         for violation in violations:
             severity = violation["severity"]
             penalty = self.violation_severity.get(severity, {}).get("score_impact", -5)
             base_score += penalty
-        
+
         return max(0.0, min(100.0, base_score))
-    
+
     def _determine_compliance_status(self, overall_score: float) -> str:
         """Determine compliance status based on score."""
         if overall_score >= self.compliance_thresholds["compliant"]:
@@ -321,14 +321,14 @@ class ComplianceAnalyzer:
             return "marginally_compliant"
         else:
             return "non_compliant"
-    
-    def _check_safe_harbor_compliance(self, phi_by_category: Dict[str, List[Any]], 
+
+    def _check_safe_harbor_compliance(self, phi_by_category: Dict[str, List[Any]],
                                     redacted_content: str = None) -> bool:
         """Check if document meets HIPAA Safe Harbor requirements."""
         if redacted_content is None:
             # Cannot verify redaction without redacted content
             return False
-        
+
         for category in self.safe_harbor_categories:
             if category in phi_by_category and phi_by_category[category]:
                 # Check if all entities in this category are redacted
@@ -337,47 +337,47 @@ class ComplianceAnalyzer:
                 )
                 if redaction_score < 100.0:  # Not fully redacted
                     return False
-        
+
         return True
-    
-    def _perform_risk_assessment(self, phi_entities: List[Any], 
-                               phi_by_category: Dict[str, List[Any]], 
+
+    def _perform_risk_assessment(self, phi_entities: List[Any],
+                               phi_by_category: Dict[str, List[Any]],
                                compliance_score: float) -> Dict[str, Any]:
         """Perform comprehensive risk assessment."""
         risk_factors = []
-        
+
         # Compliance score risk
         if compliance_score < 70:
             risk_factors.append("Low compliance score")
-        
+
         # High-risk category presence
         high_risk_categories = []
         for category, entities in phi_by_category.items():
             if entities and self.category_risk_factors.get(category, 0) >= 0.8:
                 high_risk_categories.append(category)
-        
+
         if high_risk_categories:
             risk_factors.append(f"High-risk PHI categories present: {', '.join(high_risk_categories)}")
-        
+
         # PHI density risk
         total_entities = len(phi_entities)
         if total_entities > 30:
             risk_factors.append(f"High PHI density: {total_entities} entities")
-        
+
         # Calculate overall risk level
         risk_score = 0.0
-        
+
         # Compliance score component (inverted)
         risk_score += (100 - compliance_score) / 100 * 0.4
-        
+
         # High-risk category component
         high_risk_weight = sum(self.category_risk_factors.get(cat, 0) for cat in high_risk_categories)
         risk_score += min(high_risk_weight / 3.0, 1.0) * 0.3
-        
+
         # PHI density component
         density_factor = min(total_entities / 50.0, 1.0)
         risk_score += density_factor * 0.3
-        
+
         risk_level = "low"
         if risk_score >= 0.7:
             risk_level = "critical"
@@ -385,7 +385,7 @@ class ComplianceAnalyzer:
             risk_level = "high"
         elif risk_score >= 0.3:
             risk_level = "medium"
-        
+
         return {
             "risk_level": risk_level,
             "risk_score": min(risk_score, 1.0),
@@ -394,74 +394,74 @@ class ComplianceAnalyzer:
             "total_phi_entities": total_entities,
             "requires_immediate_attention": risk_level in ["critical", "high"]
         }
-    
-    def _generate_recommendations(self, violations: List[Dict[str, Any]], 
-                                category_scores: Dict[str, float], 
+
+    def _generate_recommendations(self, violations: List[Dict[str, Any]],
+                                category_scores: Dict[str, float],
                                 overall_score: float) -> List[str]:
         """Generate compliance improvement recommendations."""
         recommendations = []
-        
+
         # Score-based recommendations
         if overall_score < 70:
             recommendations.append("Immediate compliance review required - score below acceptable threshold")
-        
+
         if overall_score < 95:
             recommendations.append("Implement comprehensive PHI redaction process")
-        
+
         # Violation-based recommendations
         critical_violations = [v for v in violations if v["severity"] == "critical"]
         if critical_violations:
             recommendations.append("Address critical violations immediately - potential HIPAA breach risk")
-        
+
         high_violations = [v for v in violations if v["severity"] == "high"]
         if high_violations:
             recommendations.append("Review and remediate high-severity violations within 24 hours")
-        
+
         # Category-specific recommendations
         low_scoring_categories = [cat for cat, score in category_scores.items() if score < 80]
         if low_scoring_categories:
             recommendations.append(f"Focus redaction efforts on categories: {', '.join(low_scoring_categories)}")
-        
+
         # Safe Harbor recommendations
-        safe_harbor_categories_present = [cat for cat in self.safe_harbor_categories 
+        safe_harbor_categories_present = [cat for cat in self.safe_harbor_categories
                                         if cat in category_scores and category_scores[cat] < 100]
         if safe_harbor_categories_present:
             recommendations.append("Ensure complete redaction of Safe Harbor categories for de-identification compliance")
-        
+
         # General recommendations
         if not recommendations:
             recommendations.append("Maintain current compliance practices and conduct regular reviews")
-        
+
         recommendations.append("Document all redaction decisions and maintain audit trail")
-        
+
         return recommendations
-    
+
     def generate_compliance_report(self, analysis_results: List[ComplianceAnalysisResult]) -> Dict[str, Any]:
         """Generate comprehensive compliance report from multiple analyses."""
         if not analysis_results:
             return {}
-        
+
         # Overall statistics
         scores = [r.overall_compliance_score for r in analysis_results]
         compliance_statuses = [r.compliance_status for r in analysis_results]
-        
+
         # Violation analysis
         all_violations = []
         for result in analysis_results:
             all_violations.extend(result.violations)
-        
+
         violation_by_type = defaultdict(int)
         violation_by_severity = defaultdict(int)
-        
+
         for violation in all_violations:
             violation_by_type[violation["type"]] += 1
             violation_by_severity[violation["severity"]] += 1
-        
+
         # Risk assessment summary
         risk_levels = [r.risk_assessment["risk_level"] for r in analysis_results]
-        high_risk_docs = sum(1 for r in analysis_results 
+        high_risk_docs = sum(1 for r in analysis_results
                            if r.risk_assessment["requires_immediate_attention"])
-        
+
         return {
             "report_generated": datetime.utcnow().isoformat(),
             "documents_analyzed": len(analysis_results),
