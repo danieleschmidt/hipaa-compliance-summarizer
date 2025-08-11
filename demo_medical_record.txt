@@ -1,0 +1,41 @@
+PATIENT MEDICAL RECORD
+
+Patient Name: John Smith
+Date of Birth: 03/15/1975
+SSN: 123-45-6789
+Medical Record Number: MRN-12345678
+Phone: (555) 123-4567
+Address: 123 Main Street, Anytown, NY 12345
+
+Date of Service: 01/15/2024
+Provider: Dr. Sarah Johnson, MD
+
+CHIEF COMPLAINT:
+Patient presents with chest pain and shortness of breath.
+
+HISTORY OF PRESENT ILLNESS:
+Mr. Smith is a 48-year-old male who reports experiencing chest pain that started approximately 2 hours ago. The pain is described as sharp and located in the center of his chest. He also reports mild shortness of breath and diaphoresis. Patient has a history of hypertension and takes Lisinopril 10mg daily.
+
+PHYSICAL EXAMINATION:
+Vital Signs: BP 145/92, HR 88, RR 18, Temp 98.6°F, O2 Sat 97%
+Patient appears in mild distress but is alert and oriented x3.
+Heart: Regular rate and rhythm, no murmurs noted
+Lungs: Clear to auscultation bilaterally
+Abdomen: Soft, non-tender
+
+ASSESSMENT AND PLAN:
+1. Chest pain - rule out acute coronary syndrome
+   - Obtained EKG showing normal sinus rhythm
+   - Ordered troponin levels q6h x 3
+   - Started on aspirin 325mg
+   - Continue telemetry monitoring
+
+2. Hypertension - continue current medications
+   - Continue Lisinopril 10mg daily
+
+DISPOSITION:
+Patient admitted to telemetry unit for cardiac monitoring and serial cardiac enzymes.
+
+Dr. Sarah Johnson, MD
+License #: NY-123456
+DEA #: BJ1234567
