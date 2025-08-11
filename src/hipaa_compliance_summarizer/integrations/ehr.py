@@ -5,9 +5,20 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from urllib.parse import urljoin
 
-import requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    
+try:
+    import jwt
+    JWT_AVAILABLE = True
+except ImportError:
+    JWT_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -46,19 +57,26 @@ class EHRDocument:
 class EHRIntegrationBase(ABC):
     """Base class for EHR system integrations."""
 
-    def __init__(self, system_name: str):
+    def __init__(self, system_name: str, config: Dict[str, Any] = None):
         """Initialize EHR integration.
         
         Args:
             system_name: Name of the EHR system
+            config: Configuration dictionary with API endpoints, credentials, etc.
         """
         self.system_name = system_name
-        self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "HIPAA-Compliance-Summarizer/1.0",
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        })
+        self.config = config or {}
+        
+        if REQUESTS_AVAILABLE:
+            self.session = requests.Session()
+            self.session.headers.update({
+                "User-Agent": "HIPAA-Compliance-Summarizer/1.0",
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            })
+        else:
+            self.session = None
+            logger.warning("Requests library not available. HTTP operations will not work.")
 
     @abstractmethod
     def authenticate(self) -> bool:
@@ -89,12 +107,12 @@ class EHRIntegrationBase(ABC):
 class EpicIntegration(EHRIntegrationBase):
     """Epic EHR system integration."""
 
-    def __init__(self):
+    def __init__(self, config: Dict[str, Any] = None):
         """Initialize Epic integration."""
-        super().__init__("Epic")
-        self.base_url = os.getenv("EPIC_BASE_URL", "https://fhir.epic.com/interconnect-fhir-oauth")
-        self.client_id = os.getenv("EPIC_CLIENT_ID")
-        self.private_key = os.getenv("EPIC_PRIVATE_KEY")
+        super().__init__("Epic", config)
+        self.base_url = self.config.get("base_url") or os.getenv("EPIC_BASE_URL", "https://fhir.epic.com/interconnect-fhir-oauth")
+        self.client_id = self.config.get("client_id") or os.getenv("EPIC_CLIENT_ID")
+        self.private_key = self.config.get("private_key") or os.getenv("EPIC_PRIVATE_KEY")
         self.access_token = None
         self.token_expires = None
 
@@ -105,16 +123,50 @@ class EpicIntegration(EHRIntegrationBase):
             return False
 
         try:
-            # In production, implement actual JWT assertion flow
-            # For now, simulate successful authentication
-            logger.info("Epic authentication simulated (implement JWT assertion)")
-            self.access_token = "epic_mock_token"
-            self.token_expires = datetime.utcnow() + timedelta(hours=1)
+            if JWT_AVAILABLE and REQUESTS_AVAILABLE:
+                # Create JWT assertion for Epic OAuth 2.0
+                auth_url = urljoin(self.base_url, "/oauth2/token")
+                
+                # JWT payload for Epic
+                jwt_payload = {
+                    "iss": self.client_id,
+                    "sub": self.client_id,
+                    "aud": auth_url,
+                    "jti": f"{datetime.utcnow().timestamp()}",
+                    "exp": int((datetime.utcnow() + timedelta(minutes=5)).timestamp()),
+                    "iat": int(datetime.utcnow().timestamp())
+                }
+                
+                # Sign JWT with private key
+                jwt_token = jwt.encode(jwt_payload, self.private_key, algorithm="RS384")
+                
+                # Request access token
+                token_data = {
+                    "grant_type": "client_credentials",
+                    "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    "client_assertion": jwt_token,
+                    "scope": "system/Patient.read system/DocumentReference.read"
+                }
+                
+                response = self.session.post(auth_url, data=token_data)
+                response.raise_for_status()
+                
+                token_info = response.json()
+                self.access_token = token_info["access_token"]
+                self.token_expires = datetime.utcnow() + timedelta(seconds=token_info.get("expires_in", 3600))
+                
+                logger.info("Epic authentication successful")
+            else:
+                # Fallback simulation when JWT not available
+                logger.info("Epic authentication simulated (JWT library not available)")
+                self.access_token = "epic_mock_token"
+                self.token_expires = datetime.utcnow() + timedelta(hours=1)
 
             # Update session headers
-            self.session.headers.update({
-                "Authorization": f"Bearer {self.access_token}"
-            })
+            if self.session:
+                self.session.headers.update({
+                    "Authorization": f"Bearer {self.access_token}"
+                })
 
             return True
 

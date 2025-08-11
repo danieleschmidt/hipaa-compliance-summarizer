@@ -7,3 +7,19 @@ detect-secrets>=1.5.0
 # Security fixes for identified vulnerabilities
 cryptography>=43.0.1
 setuptools>=78.1.1
+# Database and ORM
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.0
+# ML and AI
+scikit-learn>=1.3.0
+transformers>=4.35.0
+torch>=2.1.0
+# API and Web
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.5.0
+# Async and messaging
+aiofiles>=23.2.1
+celery>=5.3.0
+redis>=5.0.0
