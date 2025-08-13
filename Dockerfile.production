@@ -1,5 +1,5 @@
 # Production Dockerfile for HIPAA Compliance Summarizer
-FROM python:3.12-slim-bullseye as base
+FROM python:3.13-slim-bullseye as base
 
 # Security hardening
 RUN groupadd -r hipaa && useradd -r -g hipaa -s /bin/false hipaa
