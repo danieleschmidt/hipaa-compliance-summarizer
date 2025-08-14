@@ -591,6 +591,10 @@ def setup_structured_logging(config: Optional[LoggingConfig] = None) -> MetricsC
     return _global_metrics_collector
 
 
+def get_logger(name: str) -> StructuredLogger:
+    """Get a structured logger instance."""
+    return get_logger_with_metrics(name)
+
 def get_logger_with_metrics(name: str) -> StructuredLogger:
     """Get a structured logger instance with metrics support.
     
