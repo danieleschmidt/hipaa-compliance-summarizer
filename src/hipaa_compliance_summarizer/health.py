@@ -1,4 +1,147 @@
-"""Health check and monitoring endpoints for HIPAA Compliance Summarizer."""
+"""Health monitoring and system status checks for HIPAA compliance system."""
+
+import os
+import sys
+import time
+from datetime import datetime
+from typing import Dict, List, Any
+
+def system_health_check() -> Dict[str, Any]:
+    """Perform comprehensive system health check."""
+    
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "checks": {}
+    }
+    
+    # Check Python environment
+    health_status["checks"]["python"] = {
+        "version": sys.version,
+        "executable": sys.executable,
+        "status": "ok"
+    }
+    
+    # Check memory availability
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        health_status["checks"]["memory"] = {
+            "total_gb": round(memory.total / (1024**3), 2),
+            "available_gb": round(memory.available / (1024**3), 2),
+            "usage_percent": memory.percent,
+            "status": "ok" if memory.percent < 85 else "warning"
+        }
+        
+        if memory.percent >= 90:
+            health_status["status"] = "degraded"
+            
+    except ImportError:
+        health_status["checks"]["memory"] = {
+            "status": "unknown",
+            "error": "psutil not available"
+        }
+    
+    # Check disk space
+    try:
+        disk_usage = os.statvfs('.')
+        available_gb = (disk_usage.f_bavail * disk_usage.f_frsize) / (1024**3)
+        total_gb = (disk_usage.f_blocks * disk_usage.f_frsize) / (1024**3)
+        usage_percent = ((total_gb - available_gb) / total_gb) * 100
+        
+        health_status["checks"]["disk"] = {
+            "total_gb": round(total_gb, 2),
+            "available_gb": round(available_gb, 2),
+            "usage_percent": round(usage_percent, 1),
+            "status": "ok" if usage_percent < 85 else "warning"
+        }
+        
+        if usage_percent >= 95:
+            health_status["status"] = "critical"
+            
+    except Exception as e:
+        health_status["checks"]["disk"] = {
+            "status": "error",
+            "error": str(e)
+        }
+    
+    # Check core modules
+    module_checks = {}
+    core_modules = [
+        'hipaa_compliance_summarizer.processor',
+        'hipaa_compliance_summarizer.batch',
+        'hipaa_compliance_summarizer.phi',
+        'hipaa_compliance_summarizer.security'
+    ]
+    
+    for module_name in core_modules:
+        try:
+            __import__(module_name)
+            module_checks[module_name.split('.')[-1]] = {
+                "status": "ok",
+                "import_time": time.time()
+            }
+        except Exception as e:
+            module_checks[module_name.split('.')[-1]] = {
+                "status": "error",
+                "error": str(e)
+            }
+            health_status["status"] = "unhealthy"
+    
+    health_status["checks"]["modules"] = module_checks
+    
+    # Overall health assessment
+    warning_count = sum(1 for check in health_status["checks"].values() 
+                       if isinstance(check, dict) and check.get("status") == "warning")
+    error_count = sum(1 for check in health_status["checks"].values()
+                     if isinstance(check, dict) and check.get("status") == "error")
+    
+    if error_count > 0:
+        health_status["status"] = "unhealthy"
+    elif warning_count > 1:
+        health_status["status"] = "degraded"
+    
+    return health_status
+
+def get_system_metrics() -> Dict[str, Any]:
+    """Get current system performance metrics."""
+    metrics = {
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    try:
+        import psutil
+        
+        # CPU metrics
+        cpu_percent = psutil.cpu_percent(interval=1)
+        metrics["cpu"] = {
+            "usage_percent": cpu_percent,
+            "count": psutil.cpu_count()
+        }
+        
+        # Memory metrics
+        memory = psutil.virtual_memory()
+        metrics["memory"] = {
+            "total": memory.total,
+            "available": memory.available,
+            "percent": memory.percent,
+            "used": memory.used
+        }
+        
+        # Disk I/O
+        disk_io = psutil.disk_io_counters()
+        if disk_io:
+            metrics["disk_io"] = {
+                "read_bytes": disk_io.read_bytes,
+                "write_bytes": disk_io.write_bytes
+            }
+    
+    except ImportError:
+        metrics["error"] = "psutil not available for system metrics"
+    except Exception as e:
+        metrics["error"] = f"Failed to collect metrics: {e}"
+    
+    return metrics
 
 import time
 from datetime import datetime

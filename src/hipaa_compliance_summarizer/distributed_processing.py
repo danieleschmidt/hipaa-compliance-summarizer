@@ -675,6 +675,22 @@ def get_cluster_coordinator(config: Optional[Dict[str, Any]] = None) -> ClusterC
         return _global_coordinator
 
 
+def setup_distributed_processing(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Set up distributed processing configuration."""
+    try:
+        coordinator = initialize_distributed_processing(config)
+        return {
+            'status': 'configured',
+            'coordinator': coordinator,
+            'nodes': len(coordinator.known_nodes) if coordinator else 0
+        }
+    except Exception as e:
+        return {
+            'status': 'unavailable',
+            'error': str(e),
+            'nodes': 0
+        }
+
 def initialize_distributed_processing(config: Optional[Dict[str, Any]] = None) -> ClusterCoordinator:
     """Initialize distributed processing system."""
     return get_cluster_coordinator(config)
