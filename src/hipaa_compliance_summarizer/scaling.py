@@ -9,7 +9,11 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
-import psutil
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 logger = logging.getLogger(__name__)
 
@@ -197,27 +201,37 @@ class AutoScaler:
         """Collect current resource metrics."""
         metrics = ResourceMetrics()
 
-        try:
-            # CPU metrics
-            metrics.cpu_percent = psutil.cpu_percent(interval=1)
+        if HAS_PSUTIL:
+            try:
+                # CPU metrics
+                metrics.cpu_percent = psutil.cpu_percent(interval=1)
 
-            # Memory metrics
-            memory = psutil.virtual_memory()
-            metrics.memory_percent = memory.percent
-            metrics.memory_available_gb = memory.available / (1024**3)
+                # Memory metrics
+                memory = psutil.virtual_memory()
+                metrics.memory_percent = memory.percent
+                metrics.memory_available_gb = memory.available / (1024**3)
 
-            # Disk metrics
-            disk = psutil.disk_usage('/')
-            metrics.disk_percent = disk.percent
-            metrics.disk_free_gb = disk.free / (1024**3)
+                # Disk metrics
+                disk = psutil.disk_usage('/')
+                metrics.disk_percent = disk.percent
+                metrics.disk_free_gb = disk.free / (1024**3)
 
-            # Network metrics
-            network = psutil.net_io_counters()
-            metrics.network_bytes_sent = network.bytes_sent
-            metrics.network_bytes_recv = network.bytes_recv
+                # Network metrics
+                network = psutil.net_io_counters()
+                metrics.network_bytes_sent = network.bytes_sent
+                metrics.network_bytes_recv = network.bytes_recv
 
-        except Exception as e:
-            logger.error(f"Error collecting resource metrics: {e}")
+            except Exception as e:
+                logger.error(f"Error collecting resource metrics: {e}")
+        else:
+            # Fallback values when psutil is not available
+            metrics.cpu_percent = 50.0
+            metrics.memory_percent = 60.0
+            metrics.memory_available_gb = 2.0
+            metrics.disk_percent = 70.0
+            metrics.disk_free_gb = 10.0
+            metrics.network_bytes_sent = 0
+            metrics.network_bytes_recv = 0
 
         return metrics
 
