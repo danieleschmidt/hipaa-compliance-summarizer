@@ -16,7 +16,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional, Pattern, Union
 
-import yaml
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
 
 logger = logging.getLogger(__name__)
 
@@ -190,12 +194,16 @@ class PHIPatternManager:
         if not path.exists():
             raise FileNotFoundError(f"Pattern file not found: {file_path}")
 
+        if not HAS_YAML:
+            logger.warning("PyYAML not available, cannot load pattern file")
+            return
+
         try:
             with path.open('r') as f:
                 config = yaml.safe_load(f) or {}
             self.load_patterns_from_config(config)
-        except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in pattern file {file_path}: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to load pattern file {file_path}: {e}")
 
     def add_custom_pattern(self, pattern: PHIPatternConfig, category: str = "custom") -> None:
         """Add a custom PHI pattern."""

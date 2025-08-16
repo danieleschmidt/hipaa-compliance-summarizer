@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
-import yaml
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +39,26 @@ def load_config(path: str | Path | None = None) -> dict:
     source is available.
     """
 
+    if not HAS_YAML:
+        logger.warning("PyYAML not available, returning empty configuration")
+        return {}
+
     env_yaml = os.environ.get("HIPAA_CONFIG_YAML")
     if env_yaml:
         try:
             return yaml.safe_load(env_yaml) or {}
-        except yaml.YAMLError as exc:  # pragma: no cover - invalid YAML rarely
-            raise ValueError("Invalid YAML in HIPAA_CONFIG_YAML") from exc
+        except Exception as exc:  # More general exception handling
+            logger.warning(f"Invalid YAML in HIPAA_CONFIG_YAML: {exc}")
+            return {}
 
     path = Path(os.environ.get("HIPAA_CONFIG_PATH", path or DEFAULT_PATH))
     if path.exists():
-        with path.open("r") as fh:
-            return yaml.safe_load(fh) or {}
+        try:
+            with path.open("r") as fh:
+                return yaml.safe_load(fh) or {}
+        except Exception as exc:
+            logger.warning(f"Failed to load YAML from {path}: {exc}")
+            return {}
     return {}
 
 

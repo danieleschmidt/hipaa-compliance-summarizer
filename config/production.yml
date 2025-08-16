@@ -1,0 +1,303 @@
+# Production configuration for HIPAA Compliance Summarizer
+# This file contains production-specific settings for optimal performance,
+# security, and compliance in production environments.
+
+# Application Configuration
+app:
+  name: "HIPAA Compliance Summarizer"
+  version: "1.0.0"
+  environment: "production"
+  debug: false
+  
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  max_workers: 8
+  worker_timeout: 300
+  max_requests: 1000
+  max_requests_jitter: 100
+  keepalive: 2
+
+# Security Configuration
+security:
+  secret_key_rotation_days: 90
+  session_timeout_minutes: 30
+  max_login_attempts: 5
+  lockout_duration_minutes: 15
+  password_min_length: 12
+  password_require_special: true
+  password_require_numbers: true
+  password_require_uppercase: true
+  
+  # HTTPS settings
+  force_https: true
+  ssl_redirect: true
+  hsts_max_age: 31536000
+  hsts_include_subdomains: true
+  
+  # CORS settings
+  cors_enabled: false
+  cors_origins: []
+  
+  # Content Security Policy
+  csp_enabled: true
+  csp_policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';"
+
+# HIPAA Compliance Settings
+compliance:
+  level: "strict"
+  audit_logging: true
+  encryption_at_rest: true
+  phi_detection_threshold: 0.95
+  data_retention_days: 2555  # 7 years
+  audit_retention_days: 2555
+  backup_retention_days: 2555
+  
+  # Allowed document types
+  allowed_file_types:
+    - "txt"
+    - "pdf"
+    - "doc"
+    - "docx"
+    - "html"
+    - "xml"
+    - "json"
+    - "csv"
+  
+  # File size limits (in MB)
+  max_file_size: 100
+  max_batch_size: 1000
+
+# Database Configuration
+database:
+  pool_size: 20
+  max_overflow: 30
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+  
+  # Connection retry settings
+  retry_attempts: 3
+  retry_delay: 1
+  
+  # Backup settings
+  backup_enabled: true
+  backup_schedule: "0 2 * * *"  # Daily at 2 AM
+  backup_retention_days: 30
+
+# Redis Configuration
+redis:
+  db: 0
+  max_connections: 50
+  socket_timeout: 30
+  socket_connect_timeout: 30
+  socket_keepalive: true
+  socket_keepalive_options: {}
+  health_check_interval: 30
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  enable_audit: true
+  enable_performance: true
+  enable_security: true
+  
+  # Log rotation
+  max_file_size: "100MB"
+  backup_count: 10
+  
+  # Log destinations
+  console:
+    enabled: true
+    level: "INFO"
+  file:
+    enabled: true
+    level: "INFO"
+    path: "/app/logs/app.log"
+  syslog:
+    enabled: false
+    facility: "user"
+    
+  # Audit logging
+  audit:
+    enabled: true
+    file: "/app/logs/audit.log"
+    max_file_size: "100MB"
+    backup_count: 50
+
+# Performance Configuration
+performance:
+  # Caching
+  cache_enabled: true
+  cache_default_ttl: 3600
+  cache_max_size: 1000
+  
+  # Memory management
+  gc_threshold: 0.8
+  max_memory_usage: "2GB"
+  
+  # Request limits
+  max_request_size: "100MB"
+  request_timeout: 300
+  
+  # Background tasks
+  task_queue_max_size: 1000
+  task_worker_count: 4
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  metrics_enabled: true
+  health_checks_enabled: true
+  
+  # Health check endpoints
+  health_checks:
+    database:
+      enabled: true
+      timeout: 5
+      interval: 30
+    redis:
+      enabled: true
+      timeout: 5
+      interval: 30
+    disk_space:
+      enabled: true
+      warning_threshold: 80
+      critical_threshold: 95
+    memory:
+      enabled: true
+      warning_threshold: 80
+      critical_threshold: 95
+  
+  # Metrics collection
+  metrics:
+    interval: 10
+    retention_hours: 168  # 7 days
+    
+  # Alerting
+  alerts:
+    enabled: true
+    webhook_url: ""  # Set via environment variable
+    alert_channels:
+      - "email"
+      - "webhook"
+
+# PHI Detection Configuration
+phi_detection:
+  # Confidence thresholds
+  name_threshold: 0.95
+  ssn_threshold: 0.98
+  date_threshold: 0.90
+  address_threshold: 0.85
+  phone_threshold: 0.95
+  email_threshold: 0.90
+  
+  # Custom patterns
+  enable_custom_patterns: true
+  custom_patterns_file: "/app/config/custom_patterns.yml"
+  
+  # ML Model settings
+  model_cache_size: 100
+  model_timeout: 30
+  
+# Redaction Configuration
+redaction:
+  method: "synthetic_replacement"  # options: removal, masking, synthetic_replacement, tokenization
+  preserve_clinical_context: true
+  maintain_document_structure: true
+  
+  # Synthetic data settings
+  synthetic_names_file: "/app/data/synthetic_names.json"
+  synthetic_addresses_file: "/app/data/synthetic_addresses.json"
+
+# API Configuration
+api:
+  rate_limiting:
+    enabled: true
+    default_rate: "100/hour"
+    burst_rate: "20/minute"
+    
+  # API versioning
+  version: "v1"
+  prefix: "/api"
+  
+  # Documentation
+  docs_enabled: false  # Disabled in production
+  redoc_enabled: false
+  
+  # CORS for API
+  cors_enabled: false
+  cors_origins: []
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 1 * * *"  # Daily at 1 AM
+  
+  # Backup destinations
+  local:
+    enabled: true
+    path: "/app/backups"
+    retention_days: 30
+  
+  s3:
+    enabled: false
+    bucket: ""
+    region: ""
+    encryption: true
+    
+  # Backup verification
+  verify_backups: true
+  verification_schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+
+# Disaster Recovery
+disaster_recovery:
+  rpo_minutes: 60  # Recovery Point Objective
+  rto_minutes: 240  # Recovery Time Objective
+  
+  # Replication settings
+  replication:
+    enabled: false
+    target_environment: ""
+    sync_interval: 300
+
+# Compliance Reporting
+reporting:
+  enabled: true
+  schedule: "0 0 1 * *"  # Monthly on 1st day at midnight
+  
+  # Report types
+  types:
+    - "compliance_summary"
+    - "phi_detection_stats"
+    - "audit_summary"
+    - "performance_metrics"
+  
+  # Report destinations
+  email:
+    enabled: false
+    recipients: []
+  
+  storage:
+    enabled: true
+    path: "/app/reports"
+    retention_months: 84  # 7 years
+
+# Feature Flags
+features:
+  batch_processing: true
+  real_time_processing: true
+  api_access: true
+  web_interface: true
+  cli_access: true
+  audit_dashboard: true
+  performance_dashboard: true
+  
+  # Experimental features
+  experimental:
+    ml_auto_tuning: false
+    advanced_analytics: false
+    federated_learning: false

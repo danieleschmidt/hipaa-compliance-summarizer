@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import yaml
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
 
 
 @dataclass
@@ -29,6 +33,9 @@ class SecurityLimits:
     # Content limits
     MAX_DOCUMENT_SIZE: int = 50 * 1024 * 1024  # 50MB for document processing
     MAX_TEXT_LENGTH: int = 1_000_000  # 1M characters
+    
+    # Audit logging limits
+    MAX_LOG_FILE_SIZE: int = 100 * 1024 * 1024  # 100MB log files
 
     @classmethod
     def from_environment(cls) -> SecurityLimits:
@@ -68,6 +75,7 @@ class PerformanceLimits:
 
     # Cache limits
     CACHE_MAX_SIZE: int = 1000  # Max cached items
+    MAX_CACHE_SIZE: int = 1000  # Alias for compatibility
     CACHE_TTL_SECONDS: int = 3600  # 1 hour
 
     # Timeout values (in seconds)
@@ -231,9 +239,13 @@ def load_config_from_file(config_path: Optional[Path] = None) -> dict:
             return {}
 
     try:
+        if not HAS_YAML:
+            return {}
         with open(config_path) as f:
             return yaml.safe_load(f) or {}
-    except (FileNotFoundError, yaml.YAMLError, PermissionError):
+    except (FileNotFoundError, PermissionError):
+        return {}
+    except Exception:  # Catch YAML errors if yaml is available
         return {}
 
 

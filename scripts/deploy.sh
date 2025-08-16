@@ -1,13 +1,26 @@
 #!/bin/bash
+
+# HIPAA Compliance Summarizer - Production Deployment Script
+# This script handles secure deployment of the HIPAA compliance system
+# to production environments with proper security and validation checks.
+
 set -euo pipefail
 
-# HIPAA Compliance Summarizer Production Deployment Script
-# This script handles secure deployment of the HIPAA compliance system
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ENV_FILE="${PROJECT_ROOT}/.env"
+DEPLOYMENT_ENV="${DEPLOYMENT_ENV:-production}"
+DOCKER_REGISTRY="${DOCKER_REGISTRY:-}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+BACKUP_BEFORE_DEPLOY="${BACKUP_BEFORE_DEPLOY:-true}"
+SKIP_HEALTH_CHECK="${SKIP_HEALTH_CHECK:-false}"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.production.yml"
 LOG_FILE="${PROJECT_ROOT}/deploy.log"
 
