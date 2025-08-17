@@ -5,7 +5,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from urllib.parse import urljoin
 
 try:
@@ -13,7 +13,7 @@ try:
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
-    
+
 try:
     import jwt
     JWT_AVAILABLE = True
@@ -66,7 +66,7 @@ class EHRIntegrationBase(ABC):
         """
         self.system_name = system_name
         self.config = config or {}
-        
+
         if REQUESTS_AVAILABLE:
             self.session = requests.Session()
             self.session.headers.update({
@@ -126,7 +126,7 @@ class EpicIntegration(EHRIntegrationBase):
             if JWT_AVAILABLE and REQUESTS_AVAILABLE:
                 # Create JWT assertion for Epic OAuth 2.0
                 auth_url = urljoin(self.base_url, "/oauth2/token")
-                
+
                 # JWT payload for Epic
                 jwt_payload = {
                     "iss": self.client_id,
@@ -136,10 +136,10 @@ class EpicIntegration(EHRIntegrationBase):
                     "exp": int((datetime.utcnow() + timedelta(minutes=5)).timestamp()),
                     "iat": int(datetime.utcnow().timestamp())
                 }
-                
+
                 # Sign JWT with private key
                 jwt_token = jwt.encode(jwt_payload, self.private_key, algorithm="RS384")
-                
+
                 # Request access token
                 token_data = {
                     "grant_type": "client_credentials",
@@ -147,14 +147,14 @@ class EpicIntegration(EHRIntegrationBase):
                     "client_assertion": jwt_token,
                     "scope": "system/Patient.read system/DocumentReference.read"
                 }
-                
+
                 response = self.session.post(auth_url, data=token_data)
                 response.raise_for_status()
-                
+
                 token_info = response.json()
                 self.access_token = token_info["access_token"]
                 self.token_expires = datetime.utcnow() + timedelta(seconds=token_info.get("expires_in", 3600))
-                
+
                 logger.info("Epic authentication successful")
             else:
                 # Fallback simulation when JWT not available

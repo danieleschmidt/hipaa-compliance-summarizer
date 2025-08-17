@@ -3,12 +3,12 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 # Supported languages with their locale codes
 SUPPORTED_LANGUAGES = {
     'en': 'English',
-    'es': 'Español', 
+    'es': 'Español',
     'fr': 'Français',
     'de': 'Deutsch',
     'ja': '日本語',
@@ -100,24 +100,24 @@ DEFAULT_TRANSLATIONS = {
 
 class I18nManager:
     """Internationalization manager for multi-language support."""
-    
+
     def __init__(self, default_language: str = 'en'):
         """Initialize i18n manager."""
         self.current_language = default_language
         self.translations = DEFAULT_TRANSLATIONS.copy()
         self._load_external_translations()
-    
+
     def _load_external_translations(self) -> None:
         """Load translations from external files if available."""
         translations_dir = Path(__file__).parent / 'translations'
         if not translations_dir.exists():
             return
-            
+
         for lang_code in SUPPORTED_LANGUAGES.keys():
             lang_file = translations_dir / f'{lang_code}.json'
             if lang_file.exists():
                 try:
-                    with open(lang_file, 'r', encoding='utf-8') as f:
+                    with open(lang_file, encoding='utf-8') as f:
                         external_translations = json.load(f)
                         if lang_code not in self.translations:
                             self.translations[lang_code] = {}
@@ -125,22 +125,22 @@ class I18nManager:
                 except Exception:
                     # Ignore errors loading external translations
                     pass
-    
+
     def set_language(self, language_code: str) -> bool:
         """Set the current language."""
         if language_code in SUPPORTED_LANGUAGES:
             self.current_language = language_code
             return True
         return False
-    
+
     def get_language(self) -> str:
         """Get the current language code."""
         return self.current_language
-    
+
     def get_supported_languages(self) -> Dict[str, str]:
         """Get dictionary of supported languages."""
         return SUPPORTED_LANGUAGES.copy()
-    
+
     def t(self, key: str, **kwargs) -> str:
         """Translate a message key to the current language.
         
@@ -153,14 +153,14 @@ class I18nManager:
         """
         # Get translation for current language
         lang_dict = self.translations.get(self.current_language, {})
-        
+
         # Fallback to English if key not found in current language
         if key not in lang_dict:
             lang_dict = self.translations.get('en', {})
-        
+
         # Use key as fallback if no translation found
         message = lang_dict.get(key, key)
-        
+
         # Format string with parameters if provided
         if kwargs:
             try:
@@ -168,9 +168,9 @@ class I18nManager:
             except (KeyError, ValueError):
                 # Return unformatted message if formatting fails
                 pass
-        
+
         return message
-    
+
     def detect_system_language(self) -> str:
         """Detect system language from environment variables."""
         # Check common environment variables
@@ -181,7 +181,7 @@ class I18nManager:
                 lang_code = lang_env[:2].lower()
                 if lang_code in SUPPORTED_LANGUAGES:
                     return lang_code
-        
+
         # Default to English
         return 'en'
 

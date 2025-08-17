@@ -3,13 +3,12 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set
-from datetime import datetime
 
 
 class ComplianceStandard(str, Enum):
     """Supported global compliance standards."""
     HIPAA = "HIPAA"  # USA - Health Insurance Portability and Accountability Act
-    GDPR = "GDPR"    # EU - General Data Protection Regulation  
+    GDPR = "GDPR"    # EU - General Data Protection Regulation
     PDPA = "PDPA"    # Singapore - Personal Data Protection Act
     CCPA = "CCPA"    # California - California Consumer Privacy Act
     PIPEDA = "PIPEDA" # Canada - Personal Information Protection and Electronic Documents Act
@@ -20,7 +19,7 @@ class ComplianceStandard(str, Enum):
 class Region(str, Enum):
     """Global regions with different compliance requirements."""
     NORTH_AMERICA = "north_america"
-    EUROPE = "europe"  
+    EUROPE = "europe"
     ASIA_PACIFIC = "asia_pacific"
     SOUTH_AMERICA = "south_america"
     AFRICA = "africa"
@@ -30,7 +29,7 @@ class Region(str, Enum):
 @dataclass
 class ComplianceRule:
     """Individual compliance rule definition."""
-    
+
     rule_id: str
     standard: ComplianceStandard
     title: str
@@ -38,7 +37,7 @@ class ComplianceRule:
     severity: str  # 'critical', 'high', 'medium', 'low'
     regions: List[Region]
     data_categories: List[str]  # Types of data this rule applies to
-    
+
     def applies_to_data(self, data_type: str) -> bool:
         """Check if this rule applies to given data type."""
         return data_type.lower() in [cat.lower() for cat in self.data_categories]
@@ -46,12 +45,12 @@ class ComplianceRule:
 
 class GlobalComplianceManager:
     """Manager for multi-region compliance standards."""
-    
+
     def __init__(self):
         """Initialize compliance manager with global standards."""
         self.compliance_rules = self._initialize_compliance_rules()
         self.regional_requirements = self._initialize_regional_requirements()
-    
+
     def _initialize_compliance_rules(self) -> Dict[ComplianceStandard, List[ComplianceRule]]:
         """Initialize compliance rules for different standards."""
         rules = {
@@ -66,7 +65,7 @@ class GlobalComplianceManager:
                     data_categories=["phi", "medical_records", "patient_data"]
                 ),
                 ComplianceRule(
-                    rule_id="HIPAA-002", 
+                    rule_id="HIPAA-002",
                     standard=ComplianceStandard.HIPAA,
                     title="Access Logging",
                     description="All access to PHI must be logged and auditable",
@@ -76,7 +75,7 @@ class GlobalComplianceManager:
                 ),
                 ComplianceRule(
                     rule_id="HIPAA-003",
-                    standard=ComplianceStandard.HIPAA, 
+                    standard=ComplianceStandard.HIPAA,
                     title="Minimum Necessary Rule",
                     description="Access to PHI should be limited to minimum necessary",
                     severity="high",
@@ -84,14 +83,14 @@ class GlobalComplianceManager:
                     data_categories=["phi", "medical_records", "patient_data"]
                 )
             ],
-            
+
             ComplianceStandard.GDPR: [
                 ComplianceRule(
                     rule_id="GDPR-001",
                     standard=ComplianceStandard.GDPR,
                     title="Data Subject Rights",
                     description="Implement data subject access, rectification, and erasure rights",
-                    severity="critical", 
+                    severity="critical",
                     regions=[Region.EUROPE],
                     data_categories=["personal_data", "sensitive_data", "biometric_data"]
                 ),
@@ -114,7 +113,7 @@ class GlobalComplianceManager:
                     data_categories=["personal_data", "sensitive_data"]
                 )
             ],
-            
+
             ComplianceStandard.PDPA: [
                 ComplianceRule(
                     rule_id="PDPA-001",
@@ -137,36 +136,36 @@ class GlobalComplianceManager:
             ]
         }
         return rules
-    
+
     def _initialize_regional_requirements(self) -> Dict[Region, List[ComplianceStandard]]:
         """Map regions to applicable compliance standards."""
         return {
             Region.NORTH_AMERICA: [ComplianceStandard.HIPAA, ComplianceStandard.CCPA, ComplianceStandard.SOX],
             Region.EUROPE: [ComplianceStandard.GDPR],
-            Region.ASIA_PACIFIC: [ComplianceStandard.PDPA], 
+            Region.ASIA_PACIFIC: [ComplianceStandard.PDPA],
             Region.SOUTH_AMERICA: [],
             Region.AFRICA: [],
             Region.MIDDLE_EAST: []
         }
-    
+
     def get_applicable_standards(self, region: Region) -> List[ComplianceStandard]:
         """Get compliance standards applicable to a region."""
         return self.regional_requirements.get(region, [])
-    
+
     def get_rules_for_standard(self, standard: ComplianceStandard) -> List[ComplianceRule]:
         """Get all rules for a compliance standard."""
         return self.compliance_rules.get(standard, [])
-    
+
     def get_rules_for_data_type(self, data_type: str, region: Optional[Region] = None) -> List[ComplianceRule]:
         """Get applicable rules for a specific data type and region."""
         applicable_rules = []
-        
+
         # Get standards for region if specified
         if region:
             applicable_standards = self.get_applicable_standards(region)
         else:
             applicable_standards = list(self.compliance_rules.keys())
-        
+
         # Find rules that apply to the data type
         for standard in applicable_standards:
             for rule in self.get_rules_for_standard(standard):
@@ -174,14 +173,14 @@ class GlobalComplianceManager:
                     # Filter by region if specified
                     if region is None or region in rule.regions:
                         applicable_rules.append(rule)
-        
+
         return applicable_rules
-    
-    def validate_compliance(self, data_type: str, region: Region, 
+
+    def validate_compliance(self, data_type: str, region: Region,
                           implemented_controls: Set[str]) -> Dict:
         """Validate compliance for given data type and region."""
         applicable_rules = self.get_rules_for_data_type(data_type, region)
-        
+
         compliance_results = {
             'total_rules': len(applicable_rules),
             'compliant_rules': 0,
@@ -189,7 +188,7 @@ class GlobalComplianceManager:
             'compliance_score': 0.0,
             'recommendations': []
         }
-        
+
         for rule in applicable_rules:
             # Simple check if rule is implemented (would be more complex in real implementation)
             if rule.rule_id.lower() in [control.lower() for control in implemented_controls]:
@@ -201,12 +200,12 @@ class GlobalComplianceManager:
                     'severity': rule.severity,
                     'description': rule.description
                 })
-                
+
                 # Generate recommendations
                 compliance_results['recommendations'].append(
                     f"Implement {rule.title}: {rule.description}"
                 )
-        
+
         # Calculate compliance score
         if compliance_results['total_rules'] > 0:
             compliance_results['compliance_score'] = (
@@ -214,13 +213,13 @@ class GlobalComplianceManager:
             )
         else:
             compliance_results['compliance_score'] = 1.0
-        
+
         return compliance_results
-    
+
     def get_supported_regions(self) -> List[Region]:
         """Get list of supported regions."""
         return list(Region)
-    
+
     def get_supported_standards(self) -> List[ComplianceStandard]:
         """Get list of supported compliance standards."""
         return list(ComplianceStandard)
@@ -236,7 +235,7 @@ def get_compliance_manager() -> GlobalComplianceManager:
         _global_compliance_manager = GlobalComplianceManager()
     return _global_compliance_manager
 
-def validate_regional_compliance(data_type: str, region: Region, 
+def validate_regional_compliance(data_type: str, region: Region,
                                implemented_controls: Set[str]) -> Dict:
     """Validate compliance for data processing in a specific region."""
     return get_compliance_manager().validate_compliance(

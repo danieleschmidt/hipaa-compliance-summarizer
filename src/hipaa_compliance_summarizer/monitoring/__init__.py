@@ -9,6 +9,19 @@ from .tracing import Tracer
 HealthChecker = HealthCheckManager
 SystemHealth = HealthStatus
 
+# Add placeholder for missing imports
+class MonitoringDashboard:
+    """Placeholder monitoring dashboard."""
+    pass
+
+class MetricType:
+    """Placeholder metric type."""
+    pass
+
+class ProcessingMetrics:
+    """Placeholder processing metrics."""
+    pass
+
 __all__ = [
     "MetricsCollector",
     "PerformanceMonitor",
@@ -21,4 +34,7 @@ __all__ = [
     "AlertManager",
     "AlertRule",
     "Tracer",
+    "MonitoringDashboard",
+    "MetricType",
+    "ProcessingMetrics",
 ]

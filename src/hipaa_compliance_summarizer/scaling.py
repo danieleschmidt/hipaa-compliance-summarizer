@@ -102,16 +102,19 @@ class AutoScaler:
         self.monitor_thread = None
         self.check_interval_seconds = 30
 
+        # Scaling callbacks
+        self.scaling_callbacks: Dict[ResourceType, Callable] = {}
+
     def get_scaling_recommendation(self, current_metrics: Dict[str, Any]) -> Dict[str, Any]:
         """Get scaling recommendation based on current metrics."""
         cpu_usage = current_metrics.get('cpu_usage', 0)
         memory_usage = current_metrics.get('memory_usage', 0)
         queue_length = current_metrics.get('queue_length', 0)
         processing_time = current_metrics.get('processing_time', 0)
-        
+
         action = 'none'
         reason = 'metrics within normal thresholds'
-        
+
         # Simple scaling logic
         if cpu_usage > 80 or memory_usage > 85:
             action = 'scale_up'
@@ -125,16 +128,13 @@ class AutoScaler:
         elif cpu_usage < 20 and memory_usage < 30 and queue_length == 0:
             action = 'scale_down'
             reason = f'Low resource usage: CPU {cpu_usage}%, Memory {memory_usage}%'
-            
+
         return {
             'action': action,
             'reason': reason,
             'current_metrics': current_metrics,
             'timestamp': datetime.now().isoformat()
         }
-
-        # Scaling callbacks
-        self.scaling_callbacks: Dict[ResourceType, Callable] = {}
 
     def register_scaling_rule(self, rule: ScalingRule):
         """Register scaling rule.

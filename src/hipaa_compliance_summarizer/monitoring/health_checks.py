@@ -256,7 +256,7 @@ class ExternalServiceHealthCheck(BaseHealthCheck):
                 "message": f"{self.service_name} service check skipped (requests not available)",
                 "details": {"error": "requests library not available"}
             }
-            
+
         try:
             response = requests.get(self.url, timeout=self.timeout_seconds)
 
