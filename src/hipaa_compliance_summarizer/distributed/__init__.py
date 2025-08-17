@@ -3,14 +3,14 @@
 from .queue_manager import (
     DistributedQueueManager,
     QueueTask,
-    TaskStatus,
     TaskPriority,
+    TaskStatus,
     create_queue_manager,
 )
 
 __all__ = [
     "DistributedQueueManager",
-    "QueueTask", 
+    "QueueTask",
     "TaskStatus",
     "TaskPriority",
     "create_queue_manager",

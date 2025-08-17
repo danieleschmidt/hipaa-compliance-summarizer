@@ -2,9 +2,8 @@
 
 import json
 import logging
-import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -39,7 +38,7 @@ class AuditLevel(str, Enum):
 @dataclass
 class AuditEvent:
     """Structured audit event for HIPAA compliance."""
-    
+
     event_id: str
     timestamp: str
     event_type: AuditEventType
@@ -70,7 +69,7 @@ class AuditEvent:
 class AuditLogger:
     """Centralized audit logging system for HIPAA compliance."""
 
-    def __init__(self, log_file: Optional[Union[str, Path]] = None, 
+    def __init__(self, log_file: Optional[Union[str, Path]] = None,
                  max_log_size: int = SECURITY_LIMITS.MAX_LOG_FILE_SIZE,
                  backup_count: int = 5):
         """Initialize audit logger.
@@ -83,19 +82,19 @@ class AuditLogger:
         self.log_file = Path(log_file) if log_file else Path("hipaa_audit.log")
         self.max_log_size = max_log_size
         self.backup_count = backup_count
-        
+
         # Session tracking
         self.session_id = str(uuid4())
         self.session_start_time = datetime.utcnow()
-        
+
         # Event tracking
         self.event_count = 0
         self.events_by_type: Dict[AuditEventType, int] = {}
         self.events_by_level: Dict[AuditLevel, int] = {}
-        
+
         # Setup file logging
         self._setup_file_logging()
-        
+
         # Log session start
         self.log_event(
             event_type=AuditEventType.SYSTEM_EVENT,
@@ -109,28 +108,28 @@ class AuditLogger:
         try:
             # Ensure log directory exists
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Setup rotating file handler
             from logging.handlers import RotatingFileHandler
-            
+
             file_handler = RotatingFileHandler(
                 self.log_file,
                 maxBytes=self.max_log_size,
                 backupCount=self.backup_count
             )
-            
+
             # JSON formatter for structured logging
             formatter = logging.Formatter('%(message)s')
             file_handler.setFormatter(formatter)
-            
+
             # Create dedicated audit logger
             self.audit_file_logger = logging.getLogger(f"{__name__}.audit_file")
             self.audit_file_logger.setLevel(logging.INFO)
             self.audit_file_logger.addHandler(file_handler)
             self.audit_file_logger.propagate = False
-            
+
             logger.info(f"Audit logging configured: {self.log_file}")
-            
+
         except Exception as e:
             logger.error(f"Failed to setup audit file logging: {e}")
             self.audit_file_logger = None
@@ -156,7 +155,7 @@ class AuditLogger:
         """
         event_id = str(uuid4())
         timestamp = datetime.utcnow().isoformat() + "Z"
-        
+
         # Create audit event
         event = AuditEvent(
             event_id=event_id,
@@ -177,19 +176,19 @@ class AuditLogger:
             status=status,
             error_message=error_message
         )
-        
+
         # Update statistics
         self.event_count += 1
         self.events_by_type[event_type] = self.events_by_type.get(event_type, 0) + 1
         self.events_by_level[level] = self.events_by_level.get(level, 0) + 1
-        
+
         # Log to file
         if self.audit_file_logger:
             try:
                 self.audit_file_logger.info(event.to_json())
             except Exception as e:
                 logger.error(f"Failed to write audit event to file: {e}")
-        
+
         # Log to standard logger based on level
         log_message = f"AUDIT: {event_type.value} - {operation}"
         if level == AuditLevel.CRITICAL:
@@ -200,7 +199,7 @@ class AuditLogger:
             logger.warning(log_message, extra={"audit_event": event.to_dict()})
         else:
             logger.info(log_message, extra={"audit_event": event.to_dict()})
-        
+
         return event_id
 
     def log_document_processing(self,
@@ -349,7 +348,7 @@ class AuditLogger:
     def get_session_summary(self) -> Dict[str, Any]:
         """Get summary of current audit session."""
         session_duration = (datetime.utcnow() - self.session_start_time).total_seconds()
-        
+
         return {
             "session_id": self.session_id,
             "session_start_time": self.session_start_time.isoformat() + "Z",
@@ -360,7 +359,7 @@ class AuditLogger:
             "log_file": str(self.log_file)
         }
 
-    def export_audit_trail(self, 
+    def export_audit_trail(self,
                           start_time: Optional[datetime] = None,
                           end_time: Optional[datetime] = None,
                           event_types: Optional[List[AuditEventType]] = None,
@@ -372,11 +371,11 @@ class AuditLogger:
 
         events = []
         try:
-            with open(self.log_file, 'r') as f:
+            with open(self.log_file) as f:
                 for line in f:
                     try:
                         event = json.loads(line.strip())
-                        
+
                         # Filter by time range
                         if start_time or end_time:
                             event_time = datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00'))
@@ -384,13 +383,13 @@ class AuditLogger:
                                 continue
                             if end_time and event_time > end_time:
                                 continue
-                        
+
                         # Filter by event type
                         if event_types and event['event_type'] not in [et.value for et in event_types]:
                             continue
-                        
+
                         events.append(event)
-                        
+
                     except (json.JSONDecodeError, KeyError) as e:
                         logger.warning(f"Failed to parse audit log line: {e}")
                         continue
@@ -441,7 +440,7 @@ def initialize_audit_logging(log_file: Optional[Union[str, Path]] = None,
 
 __all__ = [
     "AuditEventType",
-    "AuditLevel", 
+    "AuditLevel",
     "AuditEvent",
     "AuditLogger",
     "get_audit_logger",

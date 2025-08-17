@@ -17,13 +17,16 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 try:
-    from transformers import (
-        AutoTokenizer, AutoModelForTokenClassification, 
-        AutoModelForSequenceClassification, pipeline,
-        BertTokenizer, BertForTokenClassification
-    )
     import torch
     from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+    from transformers import (
+        AutoModelForSequenceClassification,
+        AutoModelForTokenClassification,
+        AutoTokenizer,
+        BertForTokenClassification,
+        BertTokenizer,
+        pipeline,
+    )
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     TRANSFORMERS_AVAILABLE = False
@@ -142,21 +145,21 @@ class AdvancedPHIDetector(BaseMLModel):
         """Load the PHI detection model."""
         try:
             logger.info(f"Loading PHI detection model: {self.model_path}")
-            
+
             if TRANSFORMERS_AVAILABLE:
                 # Load transformer-based NER model for PHI detection
                 self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
                 self.model = AutoModelForTokenClassification.from_pretrained(self.model_path)
-                
+
                 # Create pipeline for easier inference
                 self.ner_pipeline = pipeline(
-                    "ner", 
-                    model=self.model, 
+                    "ner",
+                    model=self.model,
                     tokenizer=self.tokenizer,
                     aggregation_strategy="simple",
                     device=-1  # Use CPU for broader compatibility
                 )
-                
+
                 # Load clinical BERT if available
                 try:
                     self.clinical_tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
@@ -166,13 +169,13 @@ class AdvancedPHIDetector(BaseMLModel):
                 except Exception as e:
                     logger.warning(f"Clinical BERT not available: {e}")
                     self.clinical_available = False
-                    
+
             else:
                 # Fallback to rule-based detection
                 logger.warning("Using rule-based PHI detection fallback")
                 self.ner_pipeline = None
                 self.clinical_available = False
-            
+
             self.is_loaded = True
             logger.info("PHI detection model loaded successfully")
             return True
@@ -261,7 +264,7 @@ class AdvancedPHIDetector(BaseMLModel):
             transformer_entities = self._transformer_based_detection(text)
             entities.extend(transformer_entities)
 
-        # Strategy 2: Pattern-based detection with enhanced patterns  
+        # Strategy 2: Pattern-based detection with enhanced patterns
         pattern_entities = self._pattern_based_detection(text)
         entities.extend(pattern_entities)
 
@@ -274,18 +277,18 @@ class AdvancedPHIDetector(BaseMLModel):
         entities = self._deduplicate_entities(entities)
 
         return entities
-    
+
     def _transformer_based_detection(self, text: str) -> List[PHIEntity]:
         """Use transformer models for PHI detection."""
         entities = []
-        
+
         if not self.ner_pipeline:
             return entities
-            
+
         try:
             # Run NER pipeline on text
             ner_results = self.ner_pipeline(text)
-            
+
             for result in ner_results:
                 # Map NER labels to PHI categories
                 phi_category = self._map_ner_to_phi_category(result['entity_group'])
@@ -303,12 +306,12 @@ class AdvancedPHIDetector(BaseMLModel):
                         }
                     )
                     entities.append(entity)
-                    
+
         except Exception as e:
             logger.warning(f"Transformer-based detection failed: {e}")
-            
+
         return entities
-    
+
     def _map_ner_to_phi_category(self, ner_label: str) -> Optional[PHICategory]:
         """Map NER model labels to HIPAA PHI categories."""
         mapping = {
@@ -385,11 +388,11 @@ class AdvancedPHIDetector(BaseMLModel):
             "procedure", "admission", "discharge", "clinical", "medical", "hospital",
             "doctor", "nurse", "physician", "therapy", "surgery", "exam", "test"
         ]
-        
+
         context_start = max(0, start - window)
         context_end = min(len(text), end + window)
         context = text[context_start:context_end].lower()
-        
+
         return any(keyword in context for keyword in clinical_keywords)
 
     def _extract_context(self, text: str, start: int, end: int, window: int = 30) -> str:
@@ -401,35 +404,35 @@ class AdvancedPHIDetector(BaseMLModel):
     def _clinical_context_detection(self, text: str, context: Dict[str, Any]) -> List[PHIEntity]:
         """Enhanced detection using clinical context and domain knowledge."""
         entities = []
-        
+
         if not self.clinical_available:
             return entities
-            
+
         try:
             # Use clinical BERT for context-aware detection
             # This would involve more sophisticated clinical NLP
             # For now, return empty list - can be enhanced with actual clinical models
             pass
-            
+
         except Exception as e:
             logger.warning(f"Clinical context detection failed: {e}")
-            
+
         return entities
 
     def _deduplicate_entities(self, entities: List[PHIEntity]) -> List[PHIEntity]:
         """Remove duplicate and overlapping PHI entities."""
         if not entities:
             return entities
-            
+
         # Sort by position
         entities.sort(key=lambda e: (e.start_position, e.end_position))
-        
+
         deduplicated = []
         for entity in entities:
             # Check for overlap with existing entities
             overlaps = False
             for existing in deduplicated:
-                if (entity.start_position < existing.end_position and 
+                if (entity.start_position < existing.end_position and
                     entity.end_position > existing.start_position):
                     # Choose entity with higher confidence
                     if entity.confidence > existing.confidence:
@@ -438,10 +441,10 @@ class AdvancedPHIDetector(BaseMLModel):
                     else:
                         overlaps = True
                         break
-            
+
             if not overlaps:
                 deduplicated.append(entity)
-                
+
         return deduplicated
 
     def _calculate_metrics(self, predictions: List[Dict], ground_truth: List[Dict]) -> ModelMetrics:
@@ -457,16 +460,16 @@ class AdvancedPHIDetector(BaseMLModel):
                 confidence_threshold=self.confidence_threshold,
                 model_version=self.model_name
             )
-        
+
         # Convert predictions and ground truth to comparable format
         pred_labels = [1 if p['confidence'] > self.confidence_threshold else 0 for p in predictions]
         true_labels = [1] * len(ground_truth)  # Assuming ground truth are all positive cases
-        
+
         # Pad or truncate to match lengths
         min_len = min(len(pred_labels), len(true_labels))
         pred_labels = pred_labels[:min_len]
         true_labels = true_labels[:min_len]
-        
+
         if not pred_labels or not true_labels:
             return ModelMetrics(
                 accuracy=0.0,
@@ -477,7 +480,7 @@ class AdvancedPHIDetector(BaseMLModel):
                 confidence_threshold=self.confidence_threshold,
                 model_version=self.model_name
             )
-        
+
         # Calculate metrics using sklearn
         try:
             accuracy = accuracy_score(true_labels, pred_labels)
@@ -486,7 +489,7 @@ class AdvancedPHIDetector(BaseMLModel):
             )
         except Exception:
             accuracy = precision = recall = f1 = 0.0
-        
+
         return ModelMetrics(
             accuracy=accuracy,
             precision=precision,
@@ -500,18 +503,18 @@ class AdvancedPHIDetector(BaseMLModel):
 
 class ClinicalSummarizer(BaseMLModel):
     """Advanced clinical text summarization using transformer models."""
-    
+
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__("clinical_summarizer", config)
         self.model_path = self.config.get("model_path", "facebook/bart-large-cnn")
         self.max_length = self.config.get("max_length", 512)
         self.preserve_clinical_terms = self.config.get("preserve_clinical_terms", True)
-        
+
     def load_model(self) -> bool:
         """Load clinical summarization model."""
         try:
             logger.info(f"Loading clinical summarization model: {self.model_path}")
-            
+
             if TRANSFORMERS_AVAILABLE:
                 # Load summarization pipeline
                 self.summarization_pipeline = pipeline(
@@ -523,20 +526,20 @@ class ClinicalSummarizer(BaseMLModel):
             else:
                 logger.warning("Using rule-based summarization fallback")
                 self.summarization_pipeline = None
-            
+
             self.is_loaded = True
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to load clinical summarization model: {e}")
             self.is_loaded = False
             return False
-    
+
     @trace_operation("clinical_summarization")
     def predict(self, input_data: str, context: Dict[str, Any] = None) -> PredictionResult:
         """Generate clinical summary from PHI-redacted text."""
         start_time = time.perf_counter()
-        
+
         if not self.is_loaded:
             if not self.load_model():
                 return PredictionResult(
@@ -548,7 +551,7 @@ class ClinicalSummarizer(BaseMLModel):
                     success=False,
                     error_message="Model not loaded"
                 )
-        
+
         try:
             if TRANSFORMERS_AVAILABLE and self.summarization_pipeline:
                 # Use transformer-based summarization
@@ -564,15 +567,15 @@ class ClinicalSummarizer(BaseMLModel):
                 # Fallback to rule-based summarization
                 summary_text = self._rule_based_summarization(input_data)
                 confidence = 0.70
-            
+
             processing_time = (time.perf_counter() - start_time) * 1000
-            
+
             predictions = [{
                 "summary": summary_text,
                 "confidence": confidence,
                 "method": "transformer" if self.summarization_pipeline else "rule_based"
             }]
-            
+
             return PredictionResult(
                 predictions=predictions,
                 confidence_scores=[confidence],
@@ -584,7 +587,7 @@ class ClinicalSummarizer(BaseMLModel):
                     "compression_ratio": len(summary_text) / len(input_data) if input_data else 0
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Clinical summarization failed: {e}")
             return PredictionResult(
@@ -596,24 +599,24 @@ class ClinicalSummarizer(BaseMLModel):
                 success=False,
                 error_message=str(e)
             )
-    
+
     def _rule_based_summarization(self, text: str) -> str:
         """Fallback rule-based summarization for clinical text."""
         # Simple extractive summarization
         sentences = text.split('.')
         important_sentences = []
-        
+
         # Keywords that indicate important clinical information
         clinical_keywords = [
             'diagnosis', 'treatment', 'patient', 'procedure', 'medication',
             'symptoms', 'condition', 'therapy', 'outcome', 'discharge'
         ]
-        
+
         for sentence in sentences:
             sentence = sentence.strip()
             if sentence and any(keyword in sentence.lower() for keyword in clinical_keywords):
                 important_sentences.append(sentence)
-        
+
         if important_sentences:
             return '. '.join(important_sentences[:3]) + '.'  # Top 3 sentences
         else:
@@ -623,50 +626,50 @@ class ClinicalSummarizer(BaseMLModel):
 
 class MLModelManager:
     """Manages multiple ML models for the HIPAA system."""
-    
+
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.models: Dict[ModelType, BaseMLModel] = {}
         self.model_configs = self.config.get("models", {})
-        
+
     def initialize_models(self) -> Dict[ModelType, bool]:
         """Initialize all configured ML models."""
         results = {}
-        
+
         # Initialize PHI Detection model
         phi_config = self.model_configs.get("phi_detection", {})
         phi_detector = AdvancedPHIDetector(phi_config)
         results[ModelType.PHI_DETECTION] = phi_detector.load_model()
         if results[ModelType.PHI_DETECTION]:
             self.models[ModelType.PHI_DETECTION] = phi_detector
-        
+
         # Initialize Clinical Summarizer
         summarizer_config = self.model_configs.get("summarization", {})
         clinical_summarizer = ClinicalSummarizer(summarizer_config)
         results[ModelType.SUMMARIZATION] = clinical_summarizer.load_model()
         if results[ModelType.SUMMARIZATION]:
             self.models[ModelType.SUMMARIZATION] = clinical_summarizer
-        
+
         return results
-    
+
     def get_model(self, model_type: ModelType) -> Optional[BaseMLModel]:
         """Get a specific model by type."""
         return self.models.get(model_type)
-    
+
     def predict_phi(self, text: str, context: Dict[str, Any] = None) -> Optional[PredictionResult]:
         """Convenience method for PHI detection."""
         phi_model = self.get_model(ModelType.PHI_DETECTION)
         if phi_model:
             return phi_model.predict(text, context)
         return None
-    
+
     def summarize_clinical(self, text: str, context: Dict[str, Any] = None) -> Optional[PredictionResult]:
         """Convenience method for clinical summarization."""
         summarizer = self.get_model(ModelType.SUMMARIZATION)
         if summarizer:
             return summarizer.predict(text, context)
         return None
-    
+
     def get_model_status(self) -> Dict[str, Dict[str, Any]]:
         """Get status of all models."""
         status = {}
@@ -686,11 +689,11 @@ class MLModelManager:
 def initialize_ml_models(config: Dict[str, Any] = None) -> MLModelManager:
     """Initialize ML model manager with default models."""
     manager = MLModelManager(config)
-    
+
     # Load all configured models
     load_results = manager.initialize_models()
-    
+
     logger.info(f"ML Model Manager initialized with {len(manager.models)} models")
     logger.info(f"Model loading results: {load_results}")
-    
+
     return manager

@@ -33,7 +33,7 @@ class SecurityLimits:
     # Content limits
     MAX_DOCUMENT_SIZE: int = 50 * 1024 * 1024  # 50MB for document processing
     MAX_TEXT_LENGTH: int = 1_000_000  # 1M characters
-    
+
     # Audit logging limits
     MAX_LOG_FILE_SIZE: int = 100 * 1024 * 1024  # 100MB log files
 

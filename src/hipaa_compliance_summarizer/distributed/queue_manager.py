@@ -3,17 +3,17 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable, Union
-import time
+from typing import Any, Callable, Dict, Optional
 
 try:
-    import redis
     import aioredis
+    import redis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -50,7 +50,7 @@ class TaskPriority(int, Enum):
 @dataclass
 class QueueTask:
     """Represents a task in the processing queue."""
-    
+
     task_id: str
     task_type: str
     payload: Dict[str, Any]
@@ -91,7 +91,7 @@ class QueueTask:
         for field in ['created_at', 'started_at', 'completed_at']:
             if data.get(field):
                 data[field] = datetime.fromisoformat(data[field])
-        
+
         return cls(**data)
 
     def is_expired(self, timeout_hours: int = 24) -> bool:
@@ -117,7 +117,7 @@ class QueueBackend(ABC):
         pass
 
     @abstractmethod
-    async def update_task_status(self, task_id: str, status: TaskStatus, 
+    async def update_task_status(self, task_id: str, status: TaskStatus,
                                 progress: float = None, error_message: str = None) -> bool:
         """Update task status."""
         pass
@@ -151,7 +151,7 @@ class RedisQueueBackend(QueueBackend):
         if not REDIS_AVAILABLE:
             logger.error("Redis not available. Install redis-py and aioredis.")
             return False
-        
+
         try:
             self.redis_client = await aioredis.from_url(self.redis_url)
             await self.redis_client.ping()
@@ -176,17 +176,17 @@ class RedisQueueBackend(QueueBackend):
                 "queue": queue_name,
                 "priority": task.priority.value
             })
-            
+
             # Add to priority queue
             queue_key = f"queue:{queue_name}"
             await self.redis_client.zadd(
-                queue_key, 
+                queue_key,
                 {task.task_id: task.priority.value * 1000 + int(time.time())}
             )
-            
+
             # Set expiration (24 hours)
             await self.redis_client.expire(task_key, 86400)
-            
+
             logger.debug(f"Enqueued task {task.task_id} to queue {queue_name}")
             return True
 
@@ -204,35 +204,35 @@ class RedisQueueBackend(QueueBackend):
             # Get highest priority task
             queue_key = f"queue:{queue_name}"
             result = await self.redis_client.zrevrange(queue_key, 0, 0, withscores=True)
-            
+
             if not result:
                 return None
 
             task_id, score = result[0]
             task_id = task_id.decode('utf-8') if isinstance(task_id, bytes) else task_id
-            
+
             # Remove from queue atomically
             removed = await self.redis_client.zrem(queue_key, task_id)
             if not removed:
                 return None  # Task was already taken
-            
+
             # Get task data
             task_key = f"task:{task_id}"
             task_data = await self.redis_client.hget(task_key, "data")
-            
+
             if not task_data:
                 logger.warning(f"Task data not found for {task_id}")
                 return None
-            
+
             task_dict = json.loads(task_data)
             task = QueueTask.from_dict(task_dict)
-            
+
             # Update status to processing
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.utcnow()
-            
+
             await self.update_task_status(task_id, TaskStatus.PROCESSING)
-            
+
             logger.debug(f"Dequeued task {task_id} from queue {queue_name}")
             return task
 
@@ -240,7 +240,7 @@ class RedisQueueBackend(QueueBackend):
             logger.error(f"Failed to dequeue from {queue_name}: {e}")
             return None
 
-    async def update_task_status(self, task_id: str, status: TaskStatus, 
+    async def update_task_status(self, task_id: str, status: TaskStatus,
                                 progress: float = None, error_message: str = None) -> bool:
         """Update task status in Redis."""
         if not self.connected:
@@ -249,30 +249,30 @@ class RedisQueueBackend(QueueBackend):
 
         try:
             task_key = f"task:{task_id}"
-            
+
             # Get current task data
             task_data = await self.redis_client.hget(task_key, "data")
             if not task_data:
                 logger.warning(f"Task {task_id} not found for status update")
                 return False
-            
+
             task_dict = json.loads(task_data)
-            
+
             # Update status
             task_dict["status"] = status.value
-            
+
             if status == TaskStatus.COMPLETED:
                 task_dict["completed_at"] = datetime.utcnow().isoformat()
-            
+
             if progress is not None:
                 task_dict["progress_percentage"] = progress
-            
+
             if error_message:
                 task_dict["error_message"] = error_message
-            
+
             # Store updated data
             await self.redis_client.hset(task_key, "data", json.dumps(task_dict))
-            
+
             logger.debug(f"Updated task {task_id} status to {status.value}")
             return True
 
@@ -289,10 +289,10 @@ class RedisQueueBackend(QueueBackend):
         try:
             task_key = f"task:{task_id}"
             task_data = await self.redis_client.hget(task_key, "data")
-            
+
             if not task_data:
                 return None
-            
+
             task_dict = json.loads(task_data)
             return QueueTask.from_dict(task_dict)
 
@@ -308,16 +308,16 @@ class RedisQueueBackend(QueueBackend):
 
         try:
             queue_key = f"queue:{queue_name}"
-            
+
             # Count pending tasks
             pending_count = await self.redis_client.zcard(queue_key)
-            
+
             # Count tasks by status (scan through all task keys)
             status_counts = {"pending": pending_count, "processing": 0, "completed": 0, "failed": 0}
-            
+
             # This is a simplified version - in production, you'd want to use a more efficient approach
             # like maintaining separate counters for each status
-            
+
             return status_counts
 
         except Exception as e:
@@ -351,16 +351,16 @@ class RedisQueueBackend(QueueBackend):
 class CeleryQueueBackend(QueueBackend):
     """Celery-based queue backend."""
 
-    def __init__(self, broker_url: str = "redis://localhost:6379/1", 
+    def __init__(self, broker_url: str = "redis://localhost:6379/1",
                  result_backend: str = "redis://localhost:6379/2"):
         if not CELERY_AVAILABLE:
             logger.error("Celery not available. Install celery package.")
             return
-        
+
         self.app = Celery('hipaa_processor',
                          broker=broker_url,
                          backend=result_backend)
-        
+
         # Configure Celery
         self.app.conf.update(
             task_serializer='json',
@@ -387,7 +387,7 @@ class CeleryQueueBackend(QueueBackend):
                 task_id=task.task_id,
                 priority=task.priority.value
             )
-            
+
             logger.debug(f"Enqueued Celery task {task.task_id}")
             return True
 
@@ -400,7 +400,7 @@ class CeleryQueueBackend(QueueBackend):
         # This method is not used with Celery as it handles task distribution automatically
         return None
 
-    async def update_task_status(self, task_id: str, status: TaskStatus, 
+    async def update_task_status(self, task_id: str, status: TaskStatus,
                                 progress: float = None, error_message: str = None) -> bool:
         """Update task status in Celery."""
         if not CELERY_AVAILABLE:
@@ -408,7 +408,7 @@ class CeleryQueueBackend(QueueBackend):
 
         try:
             result = AsyncResult(task_id, app=self.app)
-            
+
             # Update task state
             if status == TaskStatus.PROCESSING:
                 result.update_state(state='PROGRESS', meta={'progress': progress or 0})
@@ -416,7 +416,7 @@ class CeleryQueueBackend(QueueBackend):
                 result.update_state(state='SUCCESS')
             elif status == TaskStatus.FAILED:
                 result.update_state(state='FAILURE', meta={'error': error_message})
-            
+
             return True
 
         except Exception as e:
@@ -430,7 +430,7 @@ class CeleryQueueBackend(QueueBackend):
 
         try:
             result = AsyncResult(task_id, app=self.app)
-            
+
             # Convert Celery state to our TaskStatus
             status_mapping = {
                 'PENDING': TaskStatus.PENDING,
@@ -440,9 +440,9 @@ class CeleryQueueBackend(QueueBackend):
                 'RETRY': TaskStatus.RETRYING,
                 'REVOKED': TaskStatus.CANCELLED
             }
-            
+
             status = status_mapping.get(result.state, TaskStatus.PENDING)
-            
+
             # Create a basic QueueTask representation
             task = QueueTask(
                 task_id=task_id,
@@ -450,11 +450,11 @@ class CeleryQueueBackend(QueueBackend):
                 payload={},
                 status=status
             )
-            
+
             if hasattr(result, 'info') and isinstance(result.info, dict):
                 task.progress_percentage = result.info.get('progress', 0)
                 task.error_message = result.info.get('error')
-            
+
             return task
 
         except Exception as e:
@@ -487,7 +487,7 @@ class DistributedQueueManager:
         self.task_handlers[task_type] = handler
         logger.info(f"Registered handler for task type: {task_type}")
 
-    async def submit_task(self, task_type: str, payload: Dict[str, Any], 
+    async def submit_task(self, task_type: str, payload: Dict[str, Any],
                          priority: TaskPriority = TaskPriority.NORMAL,
                          queue_name: str = "default") -> str:
         """Submit a new task to the queue."""
@@ -497,7 +497,7 @@ class DistributedQueueManager:
             payload=payload,
             priority=priority
         )
-        
+
         success = await self.backend.enqueue(task, queue_name)
         if success:
             logger.info(f"Submitted task {task.task_id} of type {task_type}")
@@ -517,25 +517,25 @@ class DistributedQueueManager:
         """Start worker to process tasks from queue."""
         self.running = True
         logger.info(f"Starting worker {self.worker_id} for queue {queue_name}")
-        
+
         semaphore = asyncio.Semaphore(max_concurrent)
-        
+
         async def process_task_with_semaphore(task: QueueTask):
             async with semaphore:
                 await self._process_task(task)
-        
+
         while self.running:
             try:
                 # Get next task
                 task = await self.backend.dequeue(queue_name)
-                
+
                 if task:
                     # Process task concurrently
                     asyncio.create_task(process_task_with_semaphore(task))
                 else:
                     # No tasks available, wait briefly
                     await asyncio.sleep(1)
-                    
+
             except Exception as e:
                 logger.error(f"Worker {self.worker_id} error: {e}")
                 await asyncio.sleep(5)  # Wait before retrying
@@ -548,47 +548,47 @@ class DistributedQueueManager:
     async def _process_task(self, task: QueueTask):
         """Process a single task."""
         logger.info(f"Worker {self.worker_id} processing task {task.task_id} of type {task.task_type}")
-        
+
         try:
             # Check if we have a handler for this task type
             handler = self.task_handlers.get(task.task_type)
             if not handler:
                 raise Exception(f"No handler registered for task type: {task.task_type}")
-            
+
             # Update task as processing
             task.worker_id = self.worker_id
             await self.backend.update_task_status(task.task_id, TaskStatus.PROCESSING)
-            
+
             # Execute the task handler
             result = await handler(task)
-            
+
             # Mark as completed
             await self.backend.update_task_status(task.task_id, TaskStatus.COMPLETED, progress=100.0)
-            
+
             logger.info(f"Task {task.task_id} completed successfully")
-            
+
         except Exception as e:
             logger.error(f"Task {task.task_id} failed: {e}")
-            
+
             # Check if task can be retried
             if task.can_retry():
                 task.retries += 1
                 task.status = TaskStatus.RETRYING
                 await self.backend.enqueue(task)  # Re-queue for retry
                 await self.backend.update_task_status(
-                    task.task_id, TaskStatus.RETRYING, 
+                    task.task_id, TaskStatus.RETRYING,
                     error_message=f"Retry {task.retries}/{task.max_retries}: {str(e)}"
                 )
             else:
                 await self.backend.update_task_status(
-                    task.task_id, TaskStatus.FAILED, 
+                    task.task_id, TaskStatus.FAILED,
                     error_message=str(e)
                 )
 
     async def get_queue_stats(self, queue_name: str = "default") -> Dict[str, Any]:
         """Get comprehensive queue statistics."""
         stats = await self.backend.get_queue_stats(queue_name)
-        
+
         return {
             "queue_name": queue_name,
             "worker_id": self.worker_id,
@@ -605,7 +605,7 @@ class DistributedQueueManager:
 # Factory function to create queue manager
 def create_queue_manager(backend_type: str = "redis", **kwargs) -> DistributedQueueManager:
     """Create a distributed queue manager with the specified backend."""
-    
+
     if backend_type.lower() == "redis":
         backend = RedisQueueBackend(kwargs.get("redis_url", "redis://localhost:6379/0"))
     elif backend_type.lower() == "celery":
@@ -615,6 +615,6 @@ def create_queue_manager(backend_type: str = "redis", **kwargs) -> DistributedQu
         )
     else:
         raise ValueError(f"Unsupported backend type: {backend_type}")
-    
+
     worker_id = kwargs.get("worker_id")
     return DistributedQueueManager(backend, worker_id)

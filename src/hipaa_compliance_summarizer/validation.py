@@ -6,10 +6,10 @@ import unicodedata
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional, Union
 
-from .constants import SECURITY_LIMITS, PROCESSING_CONSTANTS
-from .error_handling import ValidationError, ErrorCategory, ErrorSeverity, ErrorContext
+from .constants import PROCESSING_CONSTANTS, SECURITY_LIMITS
+from .error_handling import ErrorCategory, ErrorContext, ErrorSeverity, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -115,14 +115,14 @@ class InputValidator:
             warnings.append(f"Suspicious keywords detected: {suspicious_found}")
 
         # Control character filtering
-        control_chars = [char for char in text 
-                        if ord(char) < PROCESSING_CONSTANTS.CONTROL_CHAR_THRESHOLD 
+        control_chars = [char for char in text
+                        if ord(char) < PROCESSING_CONSTANTS.CONTROL_CHAR_THRESHOLD
                         and char not in '\t\n\r']
-        
+
         if control_chars:
             warnings.append(f"Removed {len(control_chars)} control characters")
-            text = ''.join(char for char in text 
-                          if ord(char) >= PROCESSING_CONSTANTS.CONTROL_CHAR_THRESHOLD 
+            text = ''.join(char for char in text
+                          if ord(char) >= PROCESSING_CONSTANTS.CONTROL_CHAR_THRESHOLD
                           or char in '\t\n\r')
 
         # Null byte check
@@ -201,7 +201,7 @@ class InputValidator:
         if isinstance(level, str):
             level_map = {
                 'strict': 'strict',
-                'standard': 'standard', 
+                'standard': 'standard',
                 'minimal': 'minimal'
             }
             normalized = level.lower().strip()
@@ -425,7 +425,7 @@ def validate_input_with_context(
 
 __all__ = [
     "ValidationLevel",
-    "ValidationResult", 
+    "ValidationResult",
     "InputValidator",
     "validate_input_with_context"
 ]

@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
+from sqlalchemy.orm import Session
 
 from ..models.audit_log import AuditAction, AuditEvent
 from ..models.database import (
@@ -14,16 +14,15 @@ from ..models.database import (
     PHIDetection,
     ProcessedDocument,
     ProcessingSession,
-    SystemConfiguration,
 )
 
 
 class AuditRepository:
     """Repository for audit trail and compliance data operations."""
-    
+
     def __init__(self, session: Session):
         self.session = session
-    
+
     # Processing Session Operations
     def create_processing_session(
         self,
@@ -46,7 +45,7 @@ class AuditRepository:
         self.session.commit()
         self.session.refresh(session)
         return session
-    
+
     def complete_processing_session(
         self,
         session_id: str,
@@ -56,21 +55,21 @@ class AuditRepository:
         session = self.session.query(ProcessingSession).filter(
             ProcessingSession.session_id == session_id
         ).first()
-        
+
         if session:
             session.completed_at = datetime.utcnow()
             session.status = status
             self.session.commit()
             self.session.refresh(session)
-        
+
         return session
-    
+
     def get_processing_session(self, session_id: str) -> Optional[ProcessingSession]:
         """Retrieve a processing session by ID."""
         return self.session.query(ProcessingSession).filter(
             ProcessingSession.session_id == session_id
         ).first()
-    
+
     # Document Operations
     def record_processed_document(
         self,
@@ -91,12 +90,12 @@ class AuditRepository:
         compliance_notes: Optional[str] = None,
     ) -> ProcessedDocument:
         """Record a processed document in the database."""
-        
+
         # Get session record
         processing_session = self.get_processing_session(session_id)
         if not processing_session:
             raise ValueError(f"Processing session {session_id} not found")
-        
+
         document = ProcessedDocument(
             document_id=document_id,
             session_id=processing_session.id,
@@ -114,18 +113,18 @@ class AuditRepository:
             hipaa_compliant=hipaa_compliant,
             compliance_notes=compliance_notes,
         )
-        
+
         self.session.add(document)
-        
+
         # Update session metrics
         processing_session.documents_processed += 1
         processing_session.phi_entities_detected += phi_entities_count
         processing_session.total_processing_time_ms += processing_time_ms
-        
+
         self.session.commit()
         self.session.refresh(document)
         return document
-    
+
     # PHI Detection Operations
     def record_phi_detection(
         self,
@@ -142,21 +141,21 @@ class AuditRepository:
         preserved_for_analysis: bool = False,
     ) -> PHIDetection:
         """Record a PHI detection event."""
-        
+
         # Get processing session
         processing_session = self.get_processing_session(session_id)
         if not processing_session:
             raise ValueError(f"Processing session {session_id} not found")
-        
+
         # Get document record
         document = self.session.query(ProcessedDocument).filter(
             ProcessedDocument.document_id == document_id,
             ProcessedDocument.session_id == processing_session.id
         ).first()
-        
+
         if not document:
             raise ValueError(f"Document {document_id} not found in session {session_id}")
-        
+
         phi_detection = PHIDetection(
             document_id=document.id,
             session_id=processing_session.id,
@@ -170,27 +169,27 @@ class AuditRepository:
             clinical_context=clinical_context,
             preserved_for_analysis=preserved_for_analysis,
         )
-        
+
         self.session.add(phi_detection)
-        
+
         # Update session PHI count
         processing_session.phi_entities_redacted += 1
-        
+
         self.session.commit()
         self.session.refresh(phi_detection)
         return phi_detection
-    
+
     # Audit Event Operations
     def record_audit_event(self, audit_event: AuditEvent) -> AuditEventRecord:
         """Record an audit event in the database."""
-        
+
         # Map session_id to database session if it exists
         session_uuid = None
         if audit_event.session_id:
             processing_session = self.get_processing_session(audit_event.session_id)
             if processing_session:
                 session_uuid = processing_session.id
-        
+
         audit_record = AuditEventRecord(
             event_id=audit_event.event_id,
             action=audit_event.action,
@@ -208,12 +207,12 @@ class AuditRepository:
             security_level=audit_event.security_level,
             requires_investigation=audit_event.requires_investigation,
         )
-        
+
         self.session.add(audit_record)
         self.session.commit()
         self.session.refresh(audit_record)
         return audit_record
-    
+
     def get_audit_events(
         self,
         start_time: Optional[datetime] = None,
@@ -226,9 +225,9 @@ class AuditRepository:
         offset: int = 0,
     ) -> List[AuditEventRecord]:
         """Query audit events with filters."""
-        
+
         query = self.session.query(AuditEventRecord)
-        
+
         # Apply filters
         if start_time:
             query = query.filter(AuditEventRecord.timestamp >= start_time)
@@ -242,9 +241,9 @@ class AuditRepository:
             query = query.filter(AuditEventRecord.security_level == security_level)
         if requires_investigation is not None:
             query = query.filter(AuditEventRecord.requires_investigation == requires_investigation)
-        
+
         return query.order_by(desc(AuditEventRecord.timestamp)).offset(offset).limit(limit).all()
-    
+
     # Compliance Report Operations
     def create_compliance_report(
         self,
@@ -253,7 +252,7 @@ class AuditRepository:
         generated_by: Optional[str] = None,
     ) -> ComplianceReport:
         """Generate and store a compliance report."""
-        
+
         # Calculate metrics from the database
         session_query = self.session.query(ProcessingSession).filter(
             and_(
@@ -262,14 +261,14 @@ class AuditRepository:
                 ProcessingSession.status == "completed"
             )
         )
-        
+
         document_query = self.session.query(ProcessedDocument).join(ProcessingSession).filter(
             and_(
                 ProcessingSession.started_at >= report_period_start,
                 ProcessingSession.started_at <= report_period_end
             )
         )
-        
+
         # Calculate summary metrics
         total_documents = document_query.count()
         total_phi_detected = self.session.query(func.sum(ProcessedDocument.phi_entities_count)).join(ProcessingSession).filter(
@@ -278,29 +277,29 @@ class AuditRepository:
                 ProcessingSession.started_at <= report_period_end
             )
         ).scalar() or 0
-        
+
         avg_compliance_score = self.session.query(func.avg(ProcessedDocument.compliance_score)).join(ProcessingSession).filter(
             and_(
                 ProcessingSession.started_at >= report_period_start,
                 ProcessingSession.started_at <= report_period_end
             )
         ).scalar() or 0.0
-        
+
         avg_processing_time = self.session.query(func.avg(ProcessedDocument.processing_time_ms)).join(ProcessingSession).filter(
             and_(
                 ProcessingSession.started_at >= report_period_start,
                 ProcessingSession.started_at <= report_period_end
             )
         ).scalar() or 0
-        
+
         # Risk distribution
         high_risk_count = document_query.filter(ProcessedDocument.risk_assessment == "HIGH").count()
         medium_risk_count = document_query.filter(ProcessedDocument.risk_assessment == "MEDIUM").count()
         low_risk_count = document_query.filter(ProcessedDocument.risk_assessment == "LOW").count()
-        
+
         # Violations (non-compliant documents)
         violations = document_query.filter(ProcessedDocument.hipaa_compliant == False).count()
-        
+
         report = ComplianceReport(
             report_id=f"compliance-report-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
             generated_by=generated_by,
@@ -317,12 +316,12 @@ class AuditRepository:
             low_risk_documents=low_risk_count,
             average_processing_time_ms=int(avg_processing_time),
         )
-        
+
         self.session.add(report)
         self.session.commit()
         self.session.refresh(report)
         return report
-    
+
     def get_compliance_reports(
         self,
         start_date: Optional[datetime] = None,
@@ -330,16 +329,16 @@ class AuditRepository:
         limit: int = 50
     ) -> List[ComplianceReport]:
         """Retrieve compliance reports."""
-        
+
         query = self.session.query(ComplianceReport)
-        
+
         if start_date:
             query = query.filter(ComplianceReport.report_period_start >= start_date)
         if end_date:
             query = query.filter(ComplianceReport.report_period_end <= end_date)
-        
+
         return query.order_by(desc(ComplianceReport.generated_at)).limit(limit).all()
-    
+
     # Analytics and Reporting
     def get_processing_statistics(
         self,
@@ -347,15 +346,15 @@ class AuditRepository:
         end_date: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """Get processing statistics for analytics."""
-        
+
         base_query = self.session.query(ProcessingSession)
         if start_date:
             base_query = base_query.filter(ProcessingSession.started_at >= start_date)
         if end_date:
             base_query = base_query.filter(ProcessingSession.started_at <= end_date)
-        
+
         completed_sessions = base_query.filter(ProcessingSession.status == "completed").all()
-        
+
         if not completed_sessions:
             return {
                 "total_sessions": 0,
@@ -366,45 +365,45 @@ class AuditRepository:
                 "document_types": {},
                 "risk_distribution": {},
             }
-        
+
         # Calculate statistics
         total_sessions = len(completed_sessions)
         total_documents = sum(s.documents_processed for s in completed_sessions)
         total_phi = sum(s.phi_entities_detected for s in completed_sessions)
         avg_time = sum(s.total_processing_time_ms for s in completed_sessions) / total_sessions if total_sessions > 0 else 0
-        
+
         # Compliance level distribution
         compliance_levels = {}
         for session in completed_sessions:
             level = session.compliance_level
             compliance_levels[level] = compliance_levels.get(level, 0) + 1
-        
-        # Document type distribution  
+
+        # Document type distribution
         document_type_query = self.session.query(
             ProcessedDocument.document_type,
             func.count(ProcessedDocument.id)
         ).join(ProcessingSession)
-        
+
         if start_date:
             document_type_query = document_type_query.filter(ProcessingSession.started_at >= start_date)
         if end_date:
             document_type_query = document_type_query.filter(ProcessingSession.started_at <= end_date)
-        
+
         document_types = dict(document_type_query.group_by(ProcessedDocument.document_type).all())
-        
+
         # Risk distribution
         risk_query = self.session.query(
             ProcessedDocument.risk_assessment,
             func.count(ProcessedDocument.id)
         ).join(ProcessingSession)
-        
+
         if start_date:
             risk_query = risk_query.filter(ProcessingSession.started_at >= start_date)
         if end_date:
             risk_query = risk_query.filter(ProcessingSession.started_at <= end_date)
-        
+
         risk_distribution = dict(risk_query.group_by(ProcessedDocument.risk_assessment).all())
-        
+
         return {
             "total_sessions": total_sessions,
             "total_documents": total_documents,
@@ -414,43 +413,43 @@ class AuditRepository:
             "document_types": document_types,
             "risk_distribution": risk_distribution,
         }
-    
+
     # Data Retention and Cleanup
     def cleanup_expired_records(self) -> Dict[str, int]:
         """Clean up records that have exceeded retention period."""
-        
+
         current_time = datetime.utcnow()
-        
+
         # Clean up expired audit events
         expired_audit_count = self.session.query(AuditEventRecord).filter(
             AuditEventRecord.retention_until <= current_time
         ).delete()
-        
+
         # Clean up expired documents
         expired_docs_count = self.session.query(ProcessedDocument).filter(
             ProcessedDocument.retention_until <= current_time
         ).delete()
-        
+
         # Clean up expired reports
         expired_reports_count = self.session.query(ComplianceReport).filter(
             ComplianceReport.retention_until <= current_time
         ).delete()
-        
+
         self.session.commit()
-        
+
         return {
             "expired_audit_events": expired_audit_count,
             "expired_documents": expired_docs_count,
             "expired_reports": expired_reports_count,
         }
-    
+
     def get_retention_status(self) -> Dict[str, Any]:
         """Get data retention status and upcoming expirations."""
-        
+
         current_time = datetime.utcnow()
         next_week = current_time + timedelta(days=7)
         next_month = current_time + timedelta(days=30)
-        
+
         # Count records expiring soon
         audit_expiring_week = self.session.query(AuditEventRecord).filter(
             and_(
@@ -458,14 +457,14 @@ class AuditRepository:
                 AuditEventRecord.retention_until > current_time
             )
         ).count()
-        
+
         docs_expiring_week = self.session.query(ProcessedDocument).filter(
             and_(
                 ProcessedDocument.retention_until <= next_week,
                 ProcessedDocument.retention_until > current_time
             )
         ).count()
-        
+
         return {
             "current_time": current_time.isoformat(),
             "audit_events_total": self.session.query(AuditEventRecord).count(),

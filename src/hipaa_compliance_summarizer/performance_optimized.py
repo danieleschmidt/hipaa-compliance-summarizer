@@ -7,11 +7,9 @@ import json
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
-from functools import lru_cache, wraps
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from weakref import WeakKeyDictionary
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
     import psutil
@@ -53,12 +51,12 @@ class AdaptiveCache:
         self._access_count: Dict[str, int] = {}
         self._access_times: Dict[str, float] = {}
         self._lock = threading.RLock()
-        
+
         # Adaptive sizing
         self._hit_count = 0
         self._miss_count = 0
         self._memory_pressure = False
-        
+
         # Background cleanup
         self._cleanup_thread = None
         self._stop_cleanup = threading.Event()
@@ -70,7 +68,7 @@ class AdaptiveCache:
             while not self._stop_cleanup.wait(60):  # Check every minute
                 self._cleanup_expired()
                 self._adapt_cache_size()
-        
+
         self._cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
         self._cleanup_thread.start()
 
@@ -93,7 +91,7 @@ class AdaptiveCache:
             else:
                 memory_percent = 60.0  # Assume moderate memory usage
             self._memory_pressure = memory_percent > 80
-            
+
             if self._memory_pressure:
                 # Reduce cache size under memory pressure
                 new_size = max(100, int(self.max_size * 0.7))
@@ -112,13 +110,13 @@ class AdaptiveCache:
         """Evict least recently used entries."""
         if count <= 0:
             return
-        
+
         # Sort by access time and remove oldest
         sorted_keys = sorted(
             self._access_times.keys(),
             key=lambda k: self._access_times.get(k, 0)
         )
-        
+
         for key in sorted_keys[:count]:
             self._remove_key(key)
 
@@ -134,19 +132,19 @@ class AdaptiveCache:
             if key in self._cache:
                 value, timestamp = self._cache[key]
                 current_time = time.time()
-                
+
                 # Check if expired
                 if current_time - timestamp > self.ttl_seconds:
                     self._remove_key(key)
                     self._miss_count += 1
                     return None
-                
+
                 # Update access statistics
                 self._access_count[key] = self._access_count.get(key, 0) + 1
                 self._access_times[key] = current_time
                 self._hit_count += 1
                 return value
-            
+
             self._miss_count += 1
             return None
 
@@ -154,12 +152,12 @@ class AdaptiveCache:
         """Put value in cache."""
         with self._lock:
             current_time = time.time()
-            
+
             # Check if cache is full
             if len(self._cache) >= self.max_size and key not in self._cache:
                 # Evict LRU entry
                 self._evict_lru_entries(1)
-            
+
             self._cache[key] = (value, current_time)
             self._access_count[key] = 1
             self._access_times[key] = current_time
@@ -178,7 +176,7 @@ class AdaptiveCache:
         with self._lock:
             total_requests = self._hit_count + self._miss_count
             hit_ratio = self._hit_count / total_requests if total_requests > 0 else 0
-            
+
             return {
                 "size": len(self._cache),
                 "max_size": self.max_size,
@@ -202,15 +200,15 @@ class PerformanceOptimizer:
         """Initialize performance optimizer."""
         self.performance_monitor = performance_monitor
         self.adaptive_cache = AdaptiveCache()
-        
+
         # Resource monitoring
         self._resource_monitor_thread = None
         self._stop_monitoring = threading.Event()
-        
+
         # Optimization strategies
         self._optimization_strategies = {}
         self._register_default_strategies()
-        
+
         # Performance baselines
         self._performance_baselines = {}
         self._start_resource_monitoring()
@@ -224,7 +222,7 @@ class PerformanceOptimizer:
                     self._apply_dynamic_optimizations()
                 except Exception as e:
                     logger.warning(f"Error in resource monitoring: {e}")
-        
+
         self._resource_monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
         self._resource_monitor_thread.start()
 
@@ -240,7 +238,7 @@ class PerformanceOptimizer:
                 cpu_percent = 50.0
                 memory = type('MockMemory', (), {'percent': 60.0, 'available': 2*1024*1024*1024})()
                 disk_io = type('MockDiskIO', (), {'read_bytes': 0, 'write_bytes': 0})()
-            
+
             current_time = time.time()
             baseline = {
                 "timestamp": current_time,
@@ -250,15 +248,15 @@ class PerformanceOptimizer:
                 "disk_read_mb_s": getattr(disk_io, 'read_bytes', 0) / (1024 * 1024) if disk_io else 0,
                 "disk_write_mb_s": getattr(disk_io, 'write_bytes', 0) / (1024 * 1024) if disk_io else 0
             }
-            
+
             self._performance_baselines[current_time] = baseline
-            
+
             # Keep only recent baselines (last hour)
             cutoff_time = current_time - 3600
             self._performance_baselines = {
                 t: b for t, b in self._performance_baselines.items() if t > cutoff_time
             }
-            
+
         except Exception as e:
             logger.warning(f"Error updating performance baselines: {e}")
 
@@ -266,19 +264,19 @@ class PerformanceOptimizer:
         """Apply dynamic optimizations based on current performance."""
         if not self._performance_baselines:
             return
-        
+
         latest_baseline = list(self._performance_baselines.values())[-1]
-        
+
         # CPU-based optimizations
         if latest_baseline["cpu_percent"] > 80:
             self._optimize_for_high_cpu()
         elif latest_baseline["cpu_percent"] < 20:
             self._optimize_for_low_cpu()
-        
+
         # Memory-based optimizations
         if latest_baseline["memory_percent"] > 85:
             self._optimize_for_high_memory()
-        
+
         # Disk I/O optimizations
         if latest_baseline["disk_read_mb_s"] > 100 or latest_baseline["disk_write_mb_s"] > 100:
             self._optimize_for_high_disk_io()
@@ -286,18 +284,18 @@ class PerformanceOptimizer:
     def _optimize_for_high_cpu(self):
         """Optimize for high CPU usage scenarios."""
         logger.info("Applying high CPU optimizations")
-        
+
         # Reduce cache cleanup frequency
         if hasattr(self.adaptive_cache, '_cleanup_interval'):
             self.adaptive_cache._cleanup_interval = 300  # 5 minutes
-        
+
         # Force garbage collection to free up resources
         gc.collect()
 
     def _optimize_for_low_cpu(self):
         """Optimize for low CPU usage scenarios."""
         logger.debug("Applying low CPU optimizations")
-        
+
         # Increase cache cleanup frequency
         if hasattr(self.adaptive_cache, '_cleanup_interval'):
             self.adaptive_cache._cleanup_interval = 30  # 30 seconds
@@ -305,13 +303,13 @@ class PerformanceOptimizer:
     def _optimize_for_high_memory(self):
         """Optimize for high memory usage scenarios."""
         logger.warning("Applying high memory optimizations")
-        
+
         # Trigger cache cleanup
         self.adaptive_cache._cleanup_expired()
-        
+
         # Force garbage collection
         gc.collect()
-        
+
         # Reduce cache size temporarily
         if len(self.adaptive_cache._cache) > 100:
             self.adaptive_cache._evict_lru_entries(len(self.adaptive_cache._cache) // 4)
@@ -319,7 +317,7 @@ class PerformanceOptimizer:
     def _optimize_for_high_disk_io(self):
         """Optimize for high disk I/O scenarios."""
         logger.info("Applying high disk I/O optimizations")
-        
+
         # Increase cache TTL to reduce disk reads
         self.adaptive_cache.ttl_seconds = min(7200, self.adaptive_cache.ttl_seconds * 2)
 
@@ -340,20 +338,20 @@ class PerformanceOptimizer:
         else:
             available_memory = 2048.0  # 2GB fallback
             cpu_count = 4  # 4 CPU fallback
-        
+
         # Calculate optimal batch size
         optimal_batch_size = min(
             operation_count,
             max(1, int(available_memory / 10)),  # Assume 10MB per operation
             cpu_count * 4  # 4x CPU cores
         )
-        
+
         # Calculate optimal worker count
         optimal_workers = min(
             cpu_count,
             max(1, optimal_batch_size // 10)
         )
-        
+
         return {
             "batch_size": optimal_batch_size,
             "worker_count": optimal_workers,
@@ -366,7 +364,7 @@ class PerformanceOptimizer:
             memory = psutil.virtual_memory()
         else:
             memory = type('MockMemory', (), {'percent': 60.0})()
-        
+
         return {
             "gc_threshold": 0.8 if memory.percent > 70 else 0.9,
             "cache_size_multiplier": 0.5 if memory.percent > 80 else 1.0,
@@ -379,7 +377,7 @@ class PerformanceOptimizer:
             disk_io = psutil.disk_io_counters()
         else:
             disk_io = type('MockDiskIO', (), {'read_bytes': 0, 'write_bytes': 0})()
-        
+
         return {
             "read_buffer_size": 64 * 1024 if disk_io else 8 * 1024,  # 64KB or 8KB
             "write_buffer_size": 64 * 1024 if disk_io else 8 * 1024,
@@ -395,7 +393,7 @@ class PerformanceOptimizer:
         else:
             cpu_count = 4
             cpu_percent = 50.0
-        
+
         return {
             "thread_pool_size": max(1, int(cpu_count * (100 - cpu_percent) / 100)),
             "process_pool_size": max(1, cpu_count - 1),
@@ -414,25 +412,25 @@ class PerformanceOptimizer:
     def get_optimization_metrics(self) -> OptimizationMetrics:
         """Get current optimization metrics."""
         cache_stats = self.adaptive_cache.get_stats()
-        
+
         if HAS_PSUTIL:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             memory = psutil.virtual_memory()
         else:
             cpu_percent = 50.0
             memory = type('MockMemory', (), {'percent': 60.0, 'used': 4*1024*1024*1024})()
-        
+
         # Calculate throughput from performance monitor if available
         throughput = 0.0
         response_time = 0.0
         concurrent_ops = 0
-        
+
         if self.performance_monitor:
             processing_metrics = self.performance_monitor.get_processing_metrics()
             throughput = processing_metrics.throughput_docs_per_minute
             response_time = processing_metrics.avg_processing_time * 1000  # Convert to ms
             concurrent_ops = self.performance_monitor.get_active_processing_count()
-        
+
         # Calculate optimization score
         optimization_score = self._calculate_optimization_score(
             cache_stats["hit_ratio"],
@@ -440,7 +438,7 @@ class PerformanceOptimizer:
             memory.percent,
             throughput
         )
-        
+
         return OptimizationMetrics(
             cache_hit_ratio=cache_stats["hit_ratio"],
             memory_usage_mb=memory.used / (1024 * 1024),
@@ -451,7 +449,7 @@ class PerformanceOptimizer:
             optimization_score=optimization_score
         )
 
-    def _calculate_optimization_score(self, cache_hit_ratio: float, cpu_percent: float, 
+    def _calculate_optimization_score(self, cache_hit_ratio: float, cpu_percent: float,
                                     memory_percent: float, throughput: float) -> float:
         """Calculate overall optimization score (0.0 to 1.0)."""
         # Weight different factors
@@ -459,7 +457,7 @@ class PerformanceOptimizer:
         cpu_score = max(0, 1.0 - (cpu_percent / 100))  # Lower usage is better (not overloaded)
         memory_score = max(0, 1.0 - (memory_percent / 100))  # Lower usage is better
         throughput_score = min(1.0, throughput / 100)  # Normalize to reasonable baseline
-        
+
         # Weighted average
         return (cache_score * 0.3 + cpu_score * 0.2 + memory_score * 0.2 + throughput_score * 0.3)
 
@@ -469,18 +467,18 @@ class PerformanceOptimizer:
         def wrapper(*args, **kwargs):
             # Generate cache key
             cache_key = self._generate_cache_key(func.__name__, args, kwargs)
-            
+
             # Try to get from cache
             cached_result = self.adaptive_cache.get(cache_key)
             if cached_result is not None:
                 return cached_result
-            
+
             # Execute function and cache result
             result = func(*args, **kwargs)
             self.adaptive_cache.put(cache_key, result)
-            
+
             return result
-        
+
         return wrapper
 
     def _generate_cache_key(self, func_name: str, args: tuple, kwargs: dict) -> str:
@@ -491,7 +489,7 @@ class PerformanceOptimizer:
             "args": [str(arg) for arg in args],
             "kwargs": {k: str(v) for k, v in sorted(kwargs.items())}
         }
-        
+
         key_json = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_json.encode()).hexdigest()[:16]
 
@@ -515,7 +513,7 @@ class AsyncOptimizer:
         async with self.semaphore:
             task = asyncio.create_task(coroutine)
             self._active_tasks.add(task)
-            
+
             try:
                 result = await task
                 return result
@@ -526,7 +524,7 @@ class AsyncOptimizer:
         """Execute coroutines in optimized batches."""
         if batch_size is None:
             batch_size = min(self.max_concurrent, len(coroutines))
-        
+
         results = []
         for i in range(0, len(coroutines), batch_size):
             batch = coroutines[i:i + batch_size]
@@ -534,7 +532,7 @@ class AsyncOptimizer:
                 self.optimize_async_operation(coro) for coro in batch
             ], return_exceptions=True)
             results.extend(batch_results)
-        
+
         return results
 
     def get_active_task_count(self) -> int:
@@ -562,7 +560,7 @@ def smart_cache(func: Callable) -> Callable:
 
 __all__ = [
     "OptimizationMetrics",
-    "AdaptiveCache", 
+    "AdaptiveCache",
     "PerformanceOptimizer",
     "AsyncOptimizer",
     "get_performance_optimizer",

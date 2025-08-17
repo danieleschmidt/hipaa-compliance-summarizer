@@ -693,7 +693,6 @@ class MLModelManager:
                 "average_metrics": avg_metrics.to_dict() if avg_metrics else None
             }
         return status
-            }
 
             import re
             for pattern_type, pattern in clinical_patterns.items():
