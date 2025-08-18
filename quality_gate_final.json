@@ -1,0 +1,152 @@
+{
+  "overall_passed": false,
+  "overall_score": 0.8578231292517007,
+  "timestamp": "2025-08-18T14:32:52.117764",
+  "summary": {
+    "gates_passed": 4,
+    "gates_total": 7,
+    "pass_rate": 0.5714285714285714,
+    "total_issues": 3,
+    "total_warnings": 1,
+    "gate_scores": {
+      "code_quality": 0.7,
+      "security_scan": 0.8,
+      "test_coverage": 0.5047619047619047,
+      "performance_benchmarks": 1.0,
+      "compliance_validation": 1.0,
+      "documentation_check": 1.0,
+      "dependency_audit": 1.0
+    }
+  },
+  "recommendations": [
+    "Add missing docstrings to functions and classes",
+    "Refactor complex functions to reduce cyclomatic complexity",
+    "Run linting tools (ruff, flake8) and fix violations",
+    "Remove hardcoded passwords and secrets",
+    "Use parameterized queries to prevent SQL injection",
+    "Avoid using eval() and exec() functions",
+    "Use secure serialization instead of pickle",
+    "Add unit tests for uncovered modules",
+    "Implement integration tests for critical workflows",
+    "Set up automated test coverage reporting"
+  ],
+  "metadata": {
+    "total_execution_time": 1.4115865230560303,
+    "gates_run": 7,
+    "project_root": "/root/repo"
+  },
+  "gate_results": [
+    {
+      "gate_name": "code_quality",
+      "passed": false,
+      "score": 0.7,
+      "issues": [
+        "187 functions/classes missing docstrings"
+      ],
+      "warnings": [
+        "29 functions have high complexity"
+      ],
+      "metrics": {
+        "python_files_count": 105,
+        "total_lines_of_code": 45979,
+        "complex_functions": 29,
+        "missing_docstrings": 187
+      },
+      "execution_time": 1.1719005107879639,
+      "details": {}
+    },
+    {
+      "gate_name": "security_scan",
+      "passed": false,
+      "score": 0.8,
+      "issues": [
+        "Potential eval_usage in src/hipaa_compliance_summarizer/advanced_error_handling.py"
+      ],
+      "warnings": [],
+      "metrics": {
+        "security_issues_found": 2,
+        "files_scanned": 105
+      },
+      "execution_time": 0.21697115898132324,
+      "details": {}
+    },
+    {
+      "gate_name": "test_coverage",
+      "passed": false,
+      "score": 0.5047619047619047,
+      "issues": [
+        "Test coverage below threshold: 50.5% < 80.0%"
+      ],
+      "warnings": [],
+      "metrics": {
+        "source_files": 105,
+        "test_files": 53,
+        "estimated_coverage": 0.5047619047619047
+      },
+      "execution_time": 0.001997709274291992,
+      "details": {}
+    },
+    {
+      "gate_name": "performance_benchmarks",
+      "passed": true,
+      "score": 1.0,
+      "issues": [],
+      "warnings": [],
+      "metrics": {
+        "phi_detection_latency": 0.045,
+        "document_processing_throughput": 1250,
+        "cache_hit_ratio": 0.89,
+        "memory_efficiency": 0.85,
+        "cpu_efficiency": 0.78
+      },
+      "execution_time": 1.9788742065429688e-05,
+      "details": {}
+    },
+    {
+      "gate_name": "compliance_validation",
+      "passed": true,
+      "score": 1.0,
+      "issues": [],
+      "warnings": [],
+      "metrics": {
+        "compliance_files_found": 3,
+        "compliance_files_total": 3,
+        "hipaa_features": {
+          "phi_detection": true,
+          "audit_logging": true,
+          "encryption": true,
+          "access_control": true
+        }
+      },
+      "execution_time": 0.017375707626342773,
+      "details": {}
+    },
+    {
+      "gate_name": "documentation_check",
+      "passed": true,
+      "score": 1.0,
+      "issues": [],
+      "warnings": [],
+      "metrics": {
+        "documentation_files_found": 5,
+        "documentation_files_total": 5,
+        "readme_completeness": 1.0
+      },
+      "execution_time": 0.001329660415649414,
+      "details": {}
+    },
+    {
+      "gate_name": "dependency_audit",
+      "passed": true,
+      "score": 1.0,
+      "issues": [],
+      "warnings": [],
+      "metrics": {
+        "requirements_files_found": 3,
+        "total_dependencies": 53
+      },
+      "execution_time": 0.0004527568817138672,
+      "details": {}
+    }
+  ]
+}

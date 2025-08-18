@@ -694,8 +694,20 @@ class MLModelManager:
             }
         return status
 
-            import re
-            for pattern_type, pattern in clinical_patterns.items():
+    def _detect_clinical_context(self, text: str, doc_type: str = None) -> List[PHIEntity]:
+        """Detect PHI in clinical context with enhanced accuracy."""
+        entities = []
+        
+        # Clinical context patterns for better PHI detection
+        clinical_patterns = {
+            "medical_record_number": r'(?:MRN|Medical Record|MR)[:\s#]*(\d+)',
+            "patient_identifier": r'(?:Patient|ID)[:\s#]*(\w+)',
+            "visit_date": r'(?:Visit|Seen|Date)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
+            "provider_name": r'(?:Dr\.|Doctor|Provider)[:\s]*([A-Z][a-z]+\s+[A-Z][a-z]+)',
+        }
+        
+        import re
+        for pattern_type, pattern in clinical_patterns.items():
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     # Determine appropriate PHI category
                     if "date" in pattern_type:
