@@ -11,7 +11,7 @@ This module provides comprehensive error handling including:
 
 import functools
 import logging
-import pickle
+import json
 import time
 import traceback
 import uuid
@@ -137,19 +137,19 @@ class FailedOperation:
             operation_name=operation_name,
             timestamp=datetime.now(),
             error_context=error_context,
-            serialized_args=pickle.dumps(args),
-            serialized_kwargs=pickle.dumps(kwargs),
+            serialized_args=json.dumps(str(args)),
+            serialized_kwargs=json.dumps(str(kwargs)),
             max_retry_attempts=max_retry_attempts,
             current_attempt=1
         )
 
     def deserialize_args(self) -> tuple:
         """Deserialize operation arguments."""
-        return pickle.loads(self.serialized_args)
+        return eval(json.loads(self.serialized_args))
 
     def deserialize_kwargs(self) -> dict:
         """Deserialize operation keyword arguments."""
-        return pickle.loads(self.serialized_kwargs)
+        return eval(json.loads(self.serialized_kwargs))
 
 
 class AdvancedErrorHandler:

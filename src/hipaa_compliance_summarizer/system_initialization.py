@@ -1,13 +1,16 @@
-"""System initialization and startup configuration for HIPAA compliance system.
+"""Enhanced system initialization with autonomous SDLC capabilities.
 
 This module provides comprehensive system initialization including:
 - Coordinated startup of all system components
-- Configuration validation and loading
+- Configuration validation and loading  
 - Health check initialization
-- Security monitoring setup  
+- Security monitoring setup
 - Performance monitoring setup
 - Error handling configuration
 - Graceful shutdown handling
+- Autonomous ML model management
+- Research framework initialization
+- Global compliance validation
 """
 
 import atexit
