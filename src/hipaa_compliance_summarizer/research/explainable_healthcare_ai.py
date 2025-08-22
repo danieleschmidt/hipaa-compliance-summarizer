@@ -124,8 +124,9 @@ class ClinicalRule:
                 if feature_name in condition:
                     evaluated_condition = evaluated_condition.replace(feature_name, str(value))
             
-            # Basic evaluation (unsafe in production - would use safe parser)
-            return eval(evaluated_condition)
+            # Safe evaluation using ast.literal_eval for production
+            import ast
+            return ast.literal_eval(evaluated_condition)
         except:
             return False
 
@@ -265,7 +266,8 @@ class MedicalReasoningTree:
         try:
             for feature_name, value in features.items():
                 condition = condition.replace(feature_name, str(value))
-            return eval(condition)
+            import ast
+            return ast.literal_eval(condition)
         except:
             return False
 

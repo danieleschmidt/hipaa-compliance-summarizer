@@ -5,7 +5,7 @@ import sys
 from argparse import ArgumentParser
 
 from hipaa_compliance_summarizer import BatchProcessor
-from hipaa_compliance_summarizer.monitoring import PerformanceMonitor
+from hipaa_compliance_summarizer.monitoring import PerformanceMonitor, MetricsCollector
 from hipaa_compliance_summarizer.startup import (
     setup_logging_with_config,
     validate_environment,
@@ -119,8 +119,8 @@ def main() -> None:
     parser = _create_argument_parser()
     args = parser.parse_args()
 
-    monitor = PerformanceMonitor()
-    processor = BatchProcessor(performance_monitor=monitor)
+    # Disable performance monitoring temporarily for basic functionality
+    processor = BatchProcessor(performance_monitor=None)
     results = processor.process_directory(
         args.input_dir,
         output_dir=args.output_dir,

@@ -225,7 +225,7 @@ class HealthcareErrorAnalyzer:
         ]
         
         signature_string = "|".join(str(c) for c in signature_components)
-        return hashlib.md5(signature_string.encode()).hexdigest()[:12]
+        return hashlib.sha256(signature_string.encode()).hexdigest()[:12]
     
     def _classify_error(self, error_ctx: ErrorContext) -> Dict[str, Any]:
         """Classify error based on healthcare context."""

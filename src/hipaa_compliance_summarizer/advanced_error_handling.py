@@ -145,11 +145,13 @@ class FailedOperation:
 
     def deserialize_args(self) -> tuple:
         """Deserialize operation arguments."""
-        return eval(json.loads(self.serialized_args))
+        import ast
+        return ast.literal_eval(json.loads(self.serialized_args))
 
     def deserialize_kwargs(self) -> dict:
         """Deserialize operation keyword arguments."""
-        return eval(json.loads(self.serialized_kwargs))
+        import ast
+        return ast.literal_eval(json.loads(self.serialized_kwargs))
 
 
 class AdvancedErrorHandler:
