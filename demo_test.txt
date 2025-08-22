@@ -1,0 +1,16 @@
+Patient Name: John Smith
+Social Security Number: 123-45-6789
+Date of Birth: 01/15/1980
+Address: 123 Main Street, Anytown, State 12345
+Phone: (555) 123-4567
+Email: john.smith@email.com
+
+CLINICAL NOTES:
+Patient presented with chest pain and shortness of breath.
+Vital signs stable. EKG shows normal sinus rhythm.
+Administered aspirin and monitored for 4 hours.
+Patient was discharged in stable condition with follow-up scheduled.
+
+DIAGNOSIS: Rule out myocardial infarction
+TREATMENT: Conservative management with monitoring
+DISCHARGE: Home with cardiology follow-up in 1 week

@@ -1,0 +1,4 @@
+Patient: Robert Davis, Phone: (555) 987-6543, Email: robert@email.com
+Diagnosis: Type 2 Diabetes Mellitus
+A1C: 8.2%, Blood Glucose: 180 mg/dL
+Treatment Plan: Metformin 500mg twice daily

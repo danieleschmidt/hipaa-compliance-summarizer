@@ -1,0 +1,1 @@
+Patient: Mary Johnson, DOB: [REDACTED], SSN: [REDACTED] Chief Complaint: Hypertension follow-up Blood Pressure: 140/90 mmHg, Weight: 165 lbs Prescribed: Lisinopril 10mg daily

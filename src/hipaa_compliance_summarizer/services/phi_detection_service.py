@@ -115,7 +115,7 @@ class PHIDetectionService:
 
             if confidence >= confidence_threshold:
                 phi_entity = PHIEntity(
-                    entity_id=f"phi_{hashlib.md5(f'{entity.value}_{entity.start}_{entity.end}'.encode()).hexdigest()[:8]}",
+                    entity_id=f"phi_{hashlib.sha256(f'{entity.value}_{entity.start}_{entity.end}'.encode()).hexdigest()[:8]}",
                     category=category,
                     value=entity.value,
                     confidence_score=confidence,

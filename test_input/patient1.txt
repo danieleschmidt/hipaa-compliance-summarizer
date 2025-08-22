@@ -1,0 +1,4 @@
+Patient: Mary Johnson, DOB: 03/12/1975, SSN: 987-65-4321
+Chief Complaint: Hypertension follow-up
+Blood Pressure: 140/90 mmHg, Weight: 165 lbs
+Prescribed: Lisinopril 10mg daily
