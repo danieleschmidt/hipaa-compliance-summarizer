@@ -1,0 +1,357 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-summarizer-gen4
+  namespace: hipaa-compliance
+  labels:
+    app: hipaa-summarizer
+    version: generation-4
+    tier: production
+    compliance: hipaa
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: hipaa-summarizer
+      version: generation-4
+  template:
+    metadata:
+      labels:
+        app: hipaa-summarizer
+        version: generation-4
+        tier: production
+        compliance: hipaa
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "hipaa-compliance-service"
+        vault.hashicorp.com/agent-inject-secret-hipaa-config: "secret/data/hipaa/config"
+    spec:
+      serviceAccountName: hipaa-compliance-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: hipaa-summarizer
+        image: hipaa-summarizer:generation-4-latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: COMPLIANCE_LEVEL
+          value: "strict"
+        - name: ENABLE_ML_OPTIMIZATION
+          value: "true"
+        - name: ENABLE_AUTO_SCALING
+          value: "true"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PROMETHEUS_METRICS_ENABLED
+          value: "true"
+        - name: VAULT_ADDR
+          value: "https://vault.internal.company.com:8200"
+        - name: HIPAA_CONFIG_YAML
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-config-secret
+              key: config.yaml
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+            ephemeral-storage: "4Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+        - name: logs
+          mountPath: /app/logs
+        - name: hipaa-config
+          mountPath: /app/config
+          readOnly: true
+        - name: ssl-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+      - name: performance-monitor
+        image: hipaa-performance-monitor:latest
+        ports:
+        - containerPort: 9090
+          name: perf-metrics
+        env:
+        - name: TARGET_SERVICE
+          value: "localhost:8000"
+        - name: METRICS_INTERVAL
+          value: "30"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: hipaa-config
+        secret:
+          secretName: hipaa-config-secret
+          defaultMode: 0400
+      - name: ssl-certs
+        secret:
+          secretName: ssl-certificates
+          defaultMode: 0444
+      nodeSelector:
+        node-type: compute-optimized
+        compliance-zone: hipaa-approved
+      tolerations:
+      - key: "hipaa-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - hipaa-summarizer
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                - c5.xlarge
+                - c5.2xlarge
+                - c5.4xlarge
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hipaa-summarizer-gen4-service
+  namespace: hipaa-compliance
+  labels:
+    app: hipaa-summarizer
+    version: generation-4
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 443
+    targetPort: 8000
+    protocol: TCP
+    name: https
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: hipaa-summarizer
+    version: generation-4
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hipaa-summarizer-gen4-netpol
+  namespace: hipaa-compliance
+spec:
+  podSelector:
+    matchLabels:
+      app: hipaa-summarizer
+      version: generation-4
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: hipaa-approved
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: cache
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: vault
+    ports:
+    - protocol: TCP
+      port: 8200
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hipaa-summarizer-gen4-hpa
+  namespace: hipaa-compliance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hipaa-summarizer-gen4
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: processing_queue_length
+      target:
+        type: AverageValue
+        averageValue: "10"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hipaa-summarizer-gen4-pdb
+  namespace: hipaa-compliance
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: hipaa-summarizer
+      version: generation-4
