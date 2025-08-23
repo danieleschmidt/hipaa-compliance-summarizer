@@ -1,8 +1,10 @@
-"""Resilience and recovery mechanisms for HIPAA compliance system."""
+"""Enhanced resilience and circuit breaker patterns for HIPAA compliance system."""
 
 import asyncio
+import functools
 import logging
 import random
+import signal
 import threading
 import time
 from dataclasses import dataclass
@@ -278,6 +280,104 @@ class ResilientExecutor:
             "by_operation": operation_stats,
             "recent_executions": self.execution_history[-10:]
         }
+
+
+class CircuitBreakerError(Exception):
+    """Raised when circuit breaker is open."""
+    pass
+
+
+class CircuitBreakerState(Enum):
+    """Circuit breaker states."""
+    CLOSED = "closed"      # Normal operation
+    OPEN = "open"         # Circuit is open, failing fast  
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+@dataclass
+class CircuitBreakerConfig:
+    """Configuration for circuit breaker."""
+    failure_threshold: int = 5
+    recovery_timeout: float = 60.0
+    expected_exception: type = Exception
+    name: str = "default"
+
+
+class EnhancedCircuitBreaker:
+    """Enhanced circuit breaker with healthcare-specific features."""
+
+    def __init__(self, config: CircuitBreakerConfig):
+        self.config = config
+        self.state = CircuitBreakerState.CLOSED
+        self.failure_count = 0
+        self.last_failure_time: Optional[float] = None
+        self.success_count = 0
+        self.lock = threading.Lock()
+
+    def _should_attempt_call(self) -> bool:
+        """Determine if call should be attempted based on current state."""
+        with self.lock:
+            if self.state == CircuitBreakerState.CLOSED:
+                return True
+            
+            if self.state == CircuitBreakerState.OPEN:
+                # Check if enough time has passed to try recovery
+                if (self.last_failure_time and 
+                    time.time() - self.last_failure_time >= self.config.recovery_timeout):
+                    self.state = CircuitBreakerState.HALF_OPEN
+                    logger.info(f"Circuit breaker '{self.config.name}' transitioning to HALF_OPEN")
+                    return True
+                return False
+            
+            # HALF_OPEN state - allow calls but monitor carefully
+            return True
+
+    def _on_success(self):
+        """Handle successful call."""
+        with self.lock:
+            self.failure_count = 0
+            if self.state == CircuitBreakerState.HALF_OPEN:
+                self.state = CircuitBreakerState.CLOSED
+                logger.info(f"Circuit breaker '{self.config.name}' recovered, state: CLOSED")
+
+    def _on_failure(self, exception: Exception):
+        """Handle failed call."""
+        with self.lock:
+            if isinstance(exception, self.config.expected_exception):
+                self.failure_count += 1
+                self.last_failure_time = time.time()
+                
+                if self.failure_count >= self.config.failure_threshold:
+                    self.state = CircuitBreakerState.OPEN
+                    logger.warning(
+                        f"Circuit breaker '{self.config.name}' opened after {self.failure_count} failures"
+                    )
+
+    def call(self, func: Callable, *args, **kwargs):
+        """Execute function with circuit breaker protection."""
+        if not self._should_attempt_call():
+            raise CircuitBreakerError(
+                f"Circuit breaker '{self.config.name}' is OPEN"
+            )
+
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure(e)
+            raise
+
+    def get_state(self) -> Dict[str, Any]:
+        """Get current circuit breaker state."""
+        with self.lock:
+            return {
+                "name": self.config.name,
+                "state": self.state.value,
+                "failure_count": self.failure_count,
+                "last_failure_time": self.last_failure_time,
+                "failure_threshold": self.config.failure_threshold
+            }
 
 
 class HealthMonitor:
